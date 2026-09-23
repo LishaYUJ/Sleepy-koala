@@ -1,5 +1,7 @@
 # Sleepy Koala
 
+[![CI](https://github.com/LishaYUJ/msa-sleepy-koala/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LishaYUJ/msa-sleepy-koala/actions/workflows/ci.yml)
+
 Sleepy Koala is a full-stack bedtime habit application. Users set a bedtime goal, record nightly check-ins, care for a koala whose energy reflects recent sleep consistency, build streaks, unlock badges, and compare privacy-conscious leaderboard rankings.
 
 ## Deployment
