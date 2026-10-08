@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GlassCard } from '../components/GlassCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { Auth } from '../pages/Auth';
 import { Landing } from '../pages/Landing';
+import { useStore } from '../stores/useStore';
 
 describe('Landing', () => {
   it('presents the bedtime habit and registration action', () => {
@@ -46,5 +48,55 @@ describe('GlassCard', () => {
     const card = screen.getByLabelText('Sleep summary');
     expect(card).toHaveClass('glass-card', 'interactive');
     expect(card).toHaveTextContent("Tonight's progress");
+  });
+});
+
+describe('Auth connection states', () => {
+  beforeEach(() => {
+    useStore.setState({
+      token: null,
+      isLoading: false,
+      isWakingServer: false,
+      authPhase: 'idle',
+      authErrorKind: null,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    useStore.setState({ authPhase: 'idle', authErrorKind: null, error: null });
+  });
+
+  it('keeps recovery details simple for the user', () => {
+    useStore.setState({
+      isLoading: true,
+      isWakingServer: true,
+      authPhase: 'recovering',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login?mode=register']}>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Starting the server…');
+    expect(screen.getByRole('button', { name: /please wait/i })).toBeDisabled();
+  });
+
+  it('offers a safe retry when the registration result cannot be confirmed', () => {
+    useStore.setState({
+      authErrorKind: 'registration-unconfirmed',
+      error: 'We could not confirm your registration result. You can safely try again.',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login?mode=register']}>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not confirm/i);
+    expect(screen.getByRole('button', { name: /try again/i })).toBeEnabled();
   });
 });

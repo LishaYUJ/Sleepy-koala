@@ -3,6 +3,13 @@ export interface ApiError {
   message: string;
 }
 
+interface ApiErrorPayload {
+  error?: string;
+  message?: string;
+  title?: string;
+  errors?: Record<string, string[]>;
+}
+
 export class CustomApiError extends Error {
   status: number;
   body: ApiError;
@@ -15,11 +22,29 @@ export class CustomApiError extends Error {
   }
 }
 
+export class NetworkApiError extends Error {
+  constructor() {
+    super('The connection to the server was interrupted.');
+    this.name = 'NetworkApiError';
+  }
+}
+
+export class ServerWakeTimeoutError extends Error {
+  constructor() {
+    super('The server is taking longer than expected to start.');
+    this.name = 'ServerWakeTimeoutError';
+  }
+}
+
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 const serverWakeTimeoutMs = 60_000;
 const healthRequestTimeoutMs = 5_000;
 const healthRetryDelayMs = 2_000;
+
+interface WaitUntilReadyOptions {
+  timeoutMs?: number;
+}
 
 function resolveApiUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) {
@@ -30,14 +55,35 @@ function resolveApiUrl(url: string): string {
   return `${apiBaseUrl}${path}`;
 }
 
+function normalizeApiError(status: number, body: ApiErrorPayload | null): ApiError {
+  if (body?.message) {
+    return { error: body.error || 'ApiError', message: body.message };
+  }
+
+  const validationMessages = body?.errors
+    ? Object.values(body.errors).flat().filter(Boolean)
+    : [];
+  if (validationMessages.length > 0) {
+    return { error: body?.error || 'ValidationError', message: validationMessages.join(' ') };
+  }
+
+  return {
+    error: body?.error || 'UnknownError',
+    message: body?.title || `An unexpected response was received from the server (${status}).`,
+  };
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
-async function waitUntilReady(): Promise<void> {
-  const deadline = Date.now() + serverWakeTimeoutMs;
+async function waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<void> {
+  const startedAt = Date.now();
+  const deadline = startedAt + (options.timeoutMs ?? serverWakeTimeoutMs);
+  let attempt = 0;
 
   while (Date.now() < deadline) {
+    attempt += 1;
     const controller = new AbortController();
     const remainingTime = deadline - Date.now();
     const requestTimeout = window.setTimeout(
@@ -57,9 +103,24 @@ async function waitUntilReady(): Promise<void> {
       if (response.ok) {
         return;
       }
-    } catch {
+
+      if (import.meta.env.MODE !== 'test' && (attempt === 1 || attempt % 10 === 0)) {
+        console.warn('[auth] health check returned an unhealthy response; retrying', {
+          attempt,
+          elapsedMs: Date.now() - startedAt,
+          status: response.status,
+        });
+      }
+    } catch (error) {
       // A sleeping/restarting service can fail at the network or CORS layer.
       // Retry only the harmless health check, never the account mutation.
+      if (import.meta.env.MODE !== 'test' && (attempt === 1 || attempt % 10 === 0)) {
+        console.warn('[auth] health check failed; retrying', {
+          attempt,
+          elapsedMs: Date.now() - startedAt,
+          reason: error instanceof Error ? error.name : 'NetworkError',
+        });
+      }
     } finally {
       window.clearTimeout(requestTimeout);
     }
@@ -70,7 +131,11 @@ async function waitUntilReady(): Promise<void> {
     }
   }
 
-  throw new Error('The server is taking longer than expected to start. Please try again in a moment.');
+  throw new ServerWakeTimeoutError();
+}
+
+function waitBeforeRetry(): Promise<void> {
+  return delay(healthRetryDelayMs);
 }
 
 async function request<T>(
@@ -84,10 +149,15 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(resolveApiUrl(url), {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(resolveApiUrl(url), {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new NetworkApiError();
+  }
 
   if (response.status === 204) {
     return {} as T;
@@ -96,7 +166,7 @@ async function request<T>(
   let body: any;
   try {
     body = await response.json();
-  } catch (err) {
+  } catch {
     body = null;
   }
 
@@ -108,14 +178,11 @@ async function request<T>(
         import('../stores/useStore').then(({ useStore }) => {
           useStore.getState().logout();
         });
-      } catch (err) {
+      } catch {
         // Ignore resolution error
       }
     }
-    const errorBody: ApiError = body || {
-      error: 'UnknownError',
-      message: 'An unexpected response was received from the server.'
-    };
+    const errorBody = normalizeApiError(response.status, body);
     throw new CustomApiError(response.status, errorBody);
   }
 
@@ -124,6 +191,7 @@ async function request<T>(
 
 export const api = {
   waitUntilReady,
+  waitBeforeRetry,
   get<T>(url: string, token?: string): Promise<T> {
     return request<T>(url, { method: 'GET' }, token);
   },

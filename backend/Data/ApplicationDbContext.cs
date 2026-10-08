@@ -49,6 +49,10 @@ namespace SleepyKoala.Api.Data
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.RegistrationAttemptId)
+                .IsUnique();
                 
             modelBuilder.Entity<CheckIn>()
                 .HasIndex(c => new { c.UserId, c.LocalCheckInDate })

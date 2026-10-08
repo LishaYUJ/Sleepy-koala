@@ -5,6 +5,8 @@ namespace SleepyKoala.Api.DTOs
 {
     public class RegisterRequest
     {
+        public Guid RegistrationAttemptId { get; set; }
+
         [Required, EmailAddress, StringLength(320)]
         public required string Email { get; set; }
         

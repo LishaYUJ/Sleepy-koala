@@ -115,6 +115,66 @@ namespace SleepyKoala.Tests
         }
 
         [Fact]
+        public async Task Register_WithSameAttemptId_IsIdempotent()
+        {
+            var client = _factory.CreateClient();
+            var unique = Guid.NewGuid().ToString("N");
+            var request = new RegisterRequest
+            {
+                RegistrationAttemptId = Guid.NewGuid(),
+                Email = $"idempotent-{unique}@example.com",
+                Password = "Password123!",
+                Nickname = "Idempotent Koala"
+            };
+
+            var firstResponse = await client.PostAsJsonAsync("/api/auth/register", request);
+            var retryResponse = await client.PostAsJsonAsync("/api/auth/register", request);
+
+            Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+
+            var firstAuth = await firstResponse.Content.ReadFromJsonAsync<AuthResponse>();
+            var retryAuth = await retryResponse.Content.ReadFromJsonAsync<AuthResponse>();
+            Assert.NotNull(firstAuth);
+            Assert.NotNull(retryAuth);
+            Assert.Equal(firstAuth!.UserId, retryAuth!.UserId);
+
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(1, await db.Users.CountAsync(u => u.Email == request.Email));
+        }
+
+        [Fact]
+        public async Task Register_ReusedAttemptIdWithDifferentDetails_IsRejected()
+        {
+            var client = _factory.CreateClient();
+            var attemptId = Guid.NewGuid();
+            var unique = Guid.NewGuid().ToString("N");
+            var firstRequest = new RegisterRequest
+            {
+                RegistrationAttemptId = attemptId,
+                Email = $"attempt-{unique}@example.com",
+                Password = "Password123!",
+                Nickname = "First Koala"
+            };
+            var conflictingRequest = new RegisterRequest
+            {
+                RegistrationAttemptId = attemptId,
+                Email = firstRequest.Email,
+                Password = firstRequest.Password,
+                Nickname = "Different Koala"
+            };
+
+            var firstResponse = await client.PostAsJsonAsync("/api/auth/register", firstRequest);
+            var conflictResponse = await client.PostAsJsonAsync("/api/auth/register", conflictingRequest);
+
+            Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, conflictResponse.StatusCode);
+            var error = await conflictResponse.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+            Assert.Equal("IdempotencyConflict", error!["error"]);
+        }
+
+        [Fact]
         public async Task AuthToken_FromLogin_IsAcceptedBySettingsMe()
         {
             var client = _factory.CreateClient();
@@ -402,6 +462,7 @@ namespace SleepyKoala.Tests
             var unique = Guid.NewGuid().ToString("N");
             var request = new RegisterRequest
             {
+                RegistrationAttemptId = Guid.NewGuid(),
                 Email = $"user-{unique}@example.com",
                 Password = "Password123!",
                 Nickname = $"Tester-{unique[..8]}"

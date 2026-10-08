@@ -1,5 +1,47 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
+import {
+  api,
+  CustomApiError,
+  NetworkApiError,
+  ServerWakeTimeoutError,
+} from '../services/api';
+
+export type AuthPhase = 'idle' | 'waking' | 'submitting' | 'recovering';
+export type AuthErrorKind =
+  | 'wake-timeout'
+  | 'connection'
+  | 'registration-unconfirmed'
+  | 'user-exists'
+  | 'attempt-conflict'
+  | 'server-response';
+
+class RegistrationUnconfirmedError extends Error {
+  constructor() {
+    super('We couldn’t complete registration. Please try again.');
+    this.name = 'RegistrationUnconfirmedError';
+  }
+}
+
+class RegistrationUnavailableError extends Error {
+  constructor() {
+    super('We couldn’t connect to the server. Please try again.');
+    this.name = 'RegistrationUnavailableError';
+  }
+}
+
+const registrationFlowTimeoutMs = 180_000;
+const transientRegistrationStatuses = new Set([502, 503, 504]);
+
+function isTransientRegistrationError(error: unknown): boolean {
+  return error instanceof NetworkApiError
+    || (error instanceof CustomApiError && transientRegistrationStatuses.has(error.status));
+}
+
+function logAuthEvent(message: string, details?: Record<string, unknown>): void {
+  if (import.meta.env.MODE !== 'test') {
+    console.info(`[auth] ${message}`, details ?? '');
+  }
+}
 
 export interface Badge {
   name: string;
@@ -56,6 +98,8 @@ interface AppState {
   onboardingCompleted: boolean | null;
   isLoading: boolean;
   isWakingServer: boolean;
+  authPhase: AuthPhase;
+  authErrorKind: AuthErrorKind | null;
   error: string | null;
 
   // Domain State
@@ -67,7 +111,7 @@ interface AppState {
   // Actions
   setError: (msg: string | null) => void;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, nickname: string) => Promise<void>;
+  register: (email: string, password: string, nickname: string, registrationAttemptId: string) => Promise<void>;
   logout: () => void;
   deleteAccount: () => Promise<void>;
   loadSummary: (localDateString?: string) => Promise<void>;
@@ -116,19 +160,30 @@ export const useStore = create<AppState>((set, get) => ({
   onboardingCompleted: null,
   isLoading: false,
   isWakingServer: false,
+  authPhase: 'idle',
+  authErrorKind: null,
   error: null,
   summary: null,
   history: [],
   leaderboard: [],
   badges: null,
 
-  setError: (msg) => set({ error: msg }),
+  setError: (msg) => set({
+    error: msg,
+    ...(msg === null ? { authErrorKind: null } : {}),
+  }),
 
   login: async (email, password) => {
-    set({ isLoading: true, isWakingServer: true, error: null });
+    set({
+      isLoading: true,
+      isWakingServer: true,
+      authPhase: 'waking',
+      authErrorKind: null,
+      error: null,
+    });
     try {
       await api.waitUntilReady();
-      set({ isWakingServer: false });
+      set({ isWakingServer: false, authPhase: 'submitting' });
       const response: any = await api.post('/api/auth/login', { email, password });
       
       localStorage.setItem('token', response.token);
@@ -150,22 +205,93 @@ export const useStore = create<AppState>((set, get) => ({
         onboardingCompleted: null,
         isLoading: false,
         isWakingServer: false,
+        authPhase: 'idle',
+        authErrorKind: null,
       });
 
       const sleepDate = getCurrentSleepDateString();
       await get().loadSummary(sleepDate);
     } catch (err: any) {
-      set({ isLoading: false, isWakingServer: false, error: err.body?.message || err.message });
+      const wakeTimedOut = err instanceof ServerWakeTimeoutError;
+      const networkFailed = err instanceof NetworkApiError;
+      set({
+        isLoading: false,
+        isWakingServer: false,
+        authPhase: 'idle',
+        authErrorKind: wakeTimedOut ? 'wake-timeout' : networkFailed ? 'connection' : 'server-response',
+        error: wakeTimedOut
+          ? 'We couldn’t connect to the server. Please try again.'
+          : networkFailed
+            ? 'The connection was interrupted while signing in. Please try again.'
+            : err.body?.message || err.message,
+      });
       throw err;
     }
   },
 
-  register: async (email, password, nickname) => {
-    set({ isLoading: true, isWakingServer: true, error: null });
+  register: async (email, password, nickname, registrationAttemptId) => {
+    set({
+      isLoading: true,
+      isWakingServer: true,
+      authPhase: 'waking',
+      authErrorKind: null,
+      error: null,
+    });
     try {
-      await api.waitUntilReady();
-      set({ isWakingServer: false });
-      const response: any = await api.post('/api/auth/register', { email, password, nickname });
+      const deadline = Date.now() + registrationFlowTimeoutMs;
+      const registration = { email, password, nickname, registrationAttemptId };
+      let response: any = null;
+      let registrationWasSent = false;
+      let submissionCount = 0;
+      logAuthEvent('registration flow started');
+
+      while (Date.now() < deadline && response === null) {
+        set({
+          isWakingServer: true,
+          authPhase: registrationWasSent ? 'recovering' : 'waking',
+        });
+
+        try {
+          await api.waitUntilReady({ timeoutMs: deadline - Date.now() });
+        } catch (error) {
+          if (error instanceof ServerWakeTimeoutError) {
+            break;
+          }
+          throw error;
+        }
+
+        set({ isWakingServer: false, authPhase: 'submitting' });
+        submissionCount += 1;
+        registrationWasSent = true;
+        logAuthEvent('registration request sent', { submissionCount });
+
+        try {
+          response = await api.post('/api/auth/register', registration);
+          logAuthEvent('registration completed', { submissionCount });
+        } catch (error) {
+          if (!isTransientRegistrationError(error)) {
+            throw error;
+          }
+
+          logAuthEvent('registration request interrupted; recovering', {
+            submissionCount,
+            reason: error instanceof CustomApiError
+              ? `HTTP ${error.status}`
+              : error instanceof Error
+                ? error.name
+                : 'UnknownError',
+          });
+          if (Date.now() < deadline) {
+            await api.waitBeforeRetry();
+          }
+        }
+      }
+
+      if (response === null) {
+        throw registrationWasSent
+          ? new RegistrationUnconfirmedError()
+          : new RegistrationUnavailableError();
+      }
       
       localStorage.setItem('token', response.token);
       localStorage.setItem('userId', response.userId);
@@ -186,12 +312,40 @@ export const useStore = create<AppState>((set, get) => ({
         onboardingCompleted: null,
         isLoading: false,
         isWakingServer: false,
+        authPhase: 'idle',
+        authErrorKind: null,
       });
 
       const sleepDate = getCurrentSleepDateString();
       await get().loadSummary(sleepDate);
     } catch (err: any) {
-      set({ isLoading: false, isWakingServer: false, error: err.body?.message || err.message });
+      const wakeTimedOut = err instanceof ServerWakeTimeoutError;
+      const unconfirmed = err instanceof RegistrationUnconfirmedError;
+      const unavailable = err instanceof RegistrationUnavailableError;
+      const apiError = err instanceof CustomApiError ? err.body.error : null;
+      const authErrorKind: AuthErrorKind = wakeTimedOut
+        ? 'wake-timeout'
+        : unavailable
+          ? 'wake-timeout'
+          : unconfirmed
+          ? 'registration-unconfirmed'
+          : apiError === 'UserExists'
+            ? 'user-exists'
+            : apiError === 'IdempotencyConflict'
+              ? 'attempt-conflict'
+              : 'server-response';
+
+      set({
+        isLoading: false,
+        isWakingServer: false,
+        authPhase: 'idle',
+        authErrorKind,
+        error: wakeTimedOut || unavailable
+          ? 'We couldn’t connect to the server. Please try again.'
+          : apiError === 'IdempotencyConflict'
+            ? 'Something changed during registration. Please submit again.'
+            : err.body?.message || err.message,
+      });
       throw err;
     }
   },
@@ -215,6 +369,8 @@ export const useStore = create<AppState>((set, get) => ({
       badges: null,
       isLoading: false,
       isWakingServer: false,
+      authPhase: 'idle',
+      authErrorKind: null,
       error: null
     });
   },

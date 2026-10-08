@@ -18,9 +18,32 @@ namespace SleepyKoala.Api.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterRequest request)
         {
+            if (request.RegistrationAttemptId == Guid.Empty)
+            {
+                return BadRequest(new
+                {
+                    error = "RegistrationAttemptRequired",
+                    message = "A registration attempt ID is required."
+                });
+            }
+
             var result = await _authService.RegisterAsync(request);
-            if (result == null) return BadRequest(new { error = "UserExists", message = "User already exists." });
-            return Ok(result);
+            return result.Outcome switch
+            {
+                RegistrationOutcome.Created => Ok(result.Response),
+                RegistrationOutcome.Replayed => Ok(result.Response),
+                RegistrationOutcome.UserExists => Conflict(new
+                {
+                    error = "UserExists",
+                    message = "An account with this email already exists. Try signing in instead."
+                }),
+                RegistrationOutcome.IdempotencyConflict => Conflict(new
+                {
+                    error = "IdempotencyConflict",
+                    message = "This registration attempt was already used with different details."
+                }),
+                _ => StatusCode(StatusCodes.Status500InternalServerError)
+            };
         }
 
         [HttpPost("login")]

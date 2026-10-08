@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../stores/useStore';
 import { GlassCard } from '../components/GlassCard';
 import { Sparkles, Lock, Mail, User } from 'lucide-react';
 import { KoalaLogo } from '../components/KoalaLogo';
+import { CustomApiError } from '../services/api';
 
 export const Auth: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,8 +14,9 @@ export const Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localValidation, setLocalValidation] = useState<string | null>(null);
+  const registrationAttemptId = useRef<string | null>(null);
 
-  const { login, register, isLoading, isWakingServer, error, setError, token } = useStore();
+  const { login, register, isLoading, authPhase, authErrorKind, error, setError, token } = useStore();
   const navigate = useNavigate();
 
   // If already authenticated, redirect to home
@@ -53,10 +55,14 @@ export const Auth: React.FC = () => {
       if (isLogin) {
         await login(email, password);
       } else {
-        await register(email, password, nickname);
+        registrationAttemptId.current ??= crypto.randomUUID();
+        await register(email, password, nickname, registrationAttemptId.current);
       }
       navigate('/');
     } catch (err) {
+      if (err instanceof CustomApiError && err.body.error === 'IdempotencyConflict') {
+        registrationAttemptId.current = null;
+      }
       // Handled in store
     }
   };
@@ -68,7 +74,22 @@ export const Auth: React.FC = () => {
     setError(null);
     setPassword('');
     setConfirmPassword('');
+    registrationAttemptId.current = null;
   };
+
+  const resetRegistrationAttempt = () => {
+    registrationAttemptId.current = null;
+    setError(null);
+    setLocalValidation(null);
+  };
+
+  const statusMessage = authPhase === 'waking' || authPhase === 'recovering'
+    ? 'Starting the server…'
+    : authPhase === 'submitting'
+      ? isLogin
+        ? 'Signing you in…'
+        : 'Creating your account…'
+      : null;
 
   return (
     <div className="auth-container">
@@ -138,6 +159,31 @@ export const Auth: React.FC = () => {
           text-align: left;
         }
 
+        .auth-status {
+          background-color: rgba(129, 140, 248, 0.1);
+          border: 1px solid rgba(129, 140, 248, 0.24);
+          color: var(--text-main);
+          padding: 10px 14px;
+          border-radius: 12px;
+          font-size: 0.85rem;
+          margin-bottom: 20px;
+          font-weight: 500;
+          text-align: left;
+        }
+
+        .auth-error-action {
+          display: inline-block;
+          margin-top: 8px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: var(--primary);
+          font: inherit;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
         .auth-submit-btn {
           width: 100%;
           margin-top: 10px;
@@ -176,10 +222,19 @@ export const Auth: React.FC = () => {
             : 'Track your bedtime cycles, unlock achievements, and grow your koala.'}
         </p>
 
+        {statusMessage && (
+          <div className="auth-status" role="status" aria-live="polite">
+            {statusMessage}
+          </div>
+        )}
+
         {/* Status Error Display */}
         {(error || localValidation) && (
-          <div className="auth-error">
+          <div className="auth-error" role="alert">
             {localValidation || error}
+            {!localValidation && authErrorKind === 'user-exists' && (
+              <><br /><button type="button" className="auth-error-action" onClick={toggleMode}>Log in instead</button></>
+            )}
           </div>
         )}
 
@@ -196,7 +251,7 @@ export const Auth: React.FC = () => {
                   placeholder="SleepyCat"
                   className="form-input"
                   value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
+                  onChange={(e) => { setNickname(e.target.value); resetRegistrationAttempt(); }}
                 />
               </div>
             </div>
@@ -212,7 +267,7 @@ export const Auth: React.FC = () => {
                 placeholder="you@example.com"
                 className="form-input"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); resetRegistrationAttempt(); }}
               />
             </div>
           </div>
@@ -227,7 +282,7 @@ export const Auth: React.FC = () => {
                 placeholder="******"
                 className="form-input"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); resetRegistrationAttempt(); }}
               />
             </div>
           </div>
@@ -243,7 +298,7 @@ export const Auth: React.FC = () => {
                   placeholder="******"
                   className="form-input"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => { setConfirmPassword(e.target.value); resetRegistrationAttempt(); }}
                 />
               </div>
             </div>
@@ -254,10 +309,10 @@ export const Auth: React.FC = () => {
             className="btn btn-primary auth-submit-btn"
             disabled={isLoading}
           >
-            {isWakingServer
-              ? 'Waking up server...'
-              : isLoading
-                ? 'Processing...'
+            {isLoading
+              ? 'Please wait…'
+              : authErrorKind === 'registration-unconfirmed' || authErrorKind === 'wake-timeout'
+                ? 'Try Again'
                 : isLogin
                   ? 'Sign In'
                   : 'Create Account'}
