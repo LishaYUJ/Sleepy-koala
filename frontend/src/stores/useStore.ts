@@ -55,6 +55,7 @@ interface AppState {
   avatarUrl: string | null;
   onboardingCompleted: boolean | null;
   isLoading: boolean;
+  isWakingServer: boolean;
   error: string | null;
 
   // Domain State
@@ -114,6 +115,7 @@ export const useStore = create<AppState>((set, get) => ({
   avatarUrl: localStorage.getItem('avatarUrl'),
   onboardingCompleted: null,
   isLoading: false,
+  isWakingServer: false,
   error: null,
   summary: null,
   history: [],
@@ -123,8 +125,10 @@ export const useStore = create<AppState>((set, get) => ({
   setError: (msg) => set({ error: msg }),
 
   login: async (email, password) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isWakingServer: true, error: null });
     try {
+      await api.waitUntilReady();
+      set({ isWakingServer: false });
       const response: any = await api.post('/api/auth/login', { email, password });
       
       localStorage.setItem('token', response.token);
@@ -145,19 +149,22 @@ export const useStore = create<AppState>((set, get) => ({
         avatarUrl: response.avatarDataUrl || null,
         onboardingCompleted: null,
         isLoading: false,
+        isWakingServer: false,
       });
 
       const sleepDate = getCurrentSleepDateString();
       await get().loadSummary(sleepDate);
     } catch (err: any) {
-      set({ isLoading: false, error: err.body?.message || err.message });
+      set({ isLoading: false, isWakingServer: false, error: err.body?.message || err.message });
       throw err;
     }
   },
 
   register: async (email, password, nickname) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isWakingServer: true, error: null });
     try {
+      await api.waitUntilReady();
+      set({ isWakingServer: false });
       const response: any = await api.post('/api/auth/register', { email, password, nickname });
       
       localStorage.setItem('token', response.token);
@@ -178,12 +185,13 @@ export const useStore = create<AppState>((set, get) => ({
         avatarUrl: response.avatarDataUrl || null,
         onboardingCompleted: null,
         isLoading: false,
+        isWakingServer: false,
       });
 
       const sleepDate = getCurrentSleepDateString();
       await get().loadSummary(sleepDate);
     } catch (err: any) {
-      set({ isLoading: false, error: err.body?.message || err.message });
+      set({ isLoading: false, isWakingServer: false, error: err.body?.message || err.message });
       throw err;
     }
   },
@@ -206,6 +214,7 @@ export const useStore = create<AppState>((set, get) => ({
       leaderboard: [],
       badges: null,
       isLoading: false,
+      isWakingServer: false,
       error: null
     });
   },

@@ -17,6 +17,10 @@ export class CustomApiError extends Error {
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
+const serverWakeTimeoutMs = 60_000;
+const healthRequestTimeoutMs = 5_000;
+const healthRetryDelayMs = 2_000;
+
 function resolveApiUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) {
     return url;
@@ -24,6 +28,49 @@ function resolveApiUrl(url: string): string {
 
   const path = url.startsWith('/') ? url : `/${url}`;
   return `${apiBaseUrl}${path}`;
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function waitUntilReady(): Promise<void> {
+  const deadline = Date.now() + serverWakeTimeoutMs;
+
+  while (Date.now() < deadline) {
+    const controller = new AbortController();
+    const remainingTime = deadline - Date.now();
+    const requestTimeout = window.setTimeout(
+      () => controller.abort(),
+      Math.min(healthRequestTimeoutMs, remainingTime)
+    );
+
+    try {
+      // Keep this a simple request: no credentials or custom headers are sent
+      // while Azure App Service is waking up.
+      const response = await fetch(resolveApiUrl('/health'), {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // A sleeping/restarting service can fail at the network or CORS layer.
+      // Retry only the harmless health check, never the account mutation.
+    } finally {
+      window.clearTimeout(requestTimeout);
+    }
+
+    const delayTime = Math.min(healthRetryDelayMs, deadline - Date.now());
+    if (delayTime > 0) {
+      await delay(delayTime);
+    }
+  }
+
+  throw new Error('The server is taking longer than expected to start. Please try again in a moment.');
 }
 
 async function request<T>(
@@ -76,6 +123,7 @@ async function request<T>(
 }
 
 export const api = {
+  waitUntilReady,
   get<T>(url: string, token?: string): Promise<T> {
     return request<T>(url, { method: 'GET' }, token);
   },

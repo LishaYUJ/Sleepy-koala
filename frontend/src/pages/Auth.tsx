@@ -14,7 +14,7 @@ export const Auth: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localValidation, setLocalValidation] = useState<string | null>(null);
 
-  const { login, register, isLoading, error, setError, token } = useStore();
+  const { login, register, isLoading, isWakingServer, error, setError, token } = useStore();
   const navigate = useNavigate();
 
   // If already authenticated, redirect to home
@@ -254,7 +254,13 @@ export const Auth: React.FC = () => {
             className="btn btn-primary auth-submit-btn"
             disabled={isLoading}
           >
-            {isLoading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
+            {isWakingServer
+              ? 'Waking up server...'
+              : isLoading
+                ? 'Processing...'
+                : isLogin
+                  ? 'Sign In'
+                  : 'Create Account'}
           </button>
         </form>
 
