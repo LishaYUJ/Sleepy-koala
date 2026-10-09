@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Moon, Trophy } from 'lucide-react';
 import landingPageBackground from '../assets/landingpage.png';
-import { KoalaLogo } from '../components/KoalaLogo';
 
 export const Landing: React.FC = () => (
   <main className="landing-page">
@@ -12,6 +11,7 @@ export const Landing: React.FC = () => (
       .landing-page::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(90deg,rgba(7,8,25,.22) 0%,rgba(7,8,25,.08) 48%,rgba(7,8,25,.02) 100%); }
       .landing-nav { max-width: 1180px; height: 56px; margin: 0 auto; display:flex; align-items:center; justify-content:space-between; }
       .landing-brand { display:flex; align-items:center; gap:10px; color:var(--text-main); font-size:1.2rem; }
+      .landing-brand-icon { width:34px; height:34px; object-fit:contain; flex:0 0 auto; }
       .landing-login { color:var(--text-main); font-weight:600; }
       .landing-hero { max-width:1180px; min-height:calc(100dvh - 136px); margin:0 auto; display:flex; align-items:center; }
       .landing-copy { max-width:570px; }
@@ -28,7 +28,10 @@ export const Landing: React.FC = () => (
       @media (max-width:760px) { .landing-page { padding-top:16px; } .landing-page::before { background-position:88% center; } .landing-page::after { background:linear-gradient(180deg,rgba(7,8,25,.2),rgba(7,8,25,.55)); } .landing-hero { min-height:calc(100dvh - 92px); padding:52px 0 40px; } .landing-copy { padding:24px 18px; border-radius:20px; background:rgba(8,10,30,.42); backdrop-filter:blur(7px); } .landing-copy h1 { font-size:3.2rem; } .landing-steps { grid-template-columns:1fr; } }
     `}</style>
     <nav className="landing-nav" aria-label="Main navigation">
-      <Link className="landing-brand brand-font" to="/"><KoalaLogo style={{ width: 28, height: 28, color: 'currentColor' }} aria-hidden="true" />Sleepy Koala</Link>
+      <Link className="landing-brand brand-font" to="/">
+        <img className="landing-brand-icon" src="/icons/sleepy-koala-app-icon.png?v=2" alt="" aria-hidden="true" />
+        Sleepy Koala
+      </Link>
       <Link className="landing-login" to="/login">Log in</Link>
     </nav>
     <section className="landing-hero">
