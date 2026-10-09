@@ -457,6 +457,40 @@ namespace SleepyKoala.Tests
             Assert.Null(missing.Id);
         }
 
+        [Fact]
+        public async Task History_IncludesARealCheckInBeforeTheStoredTrackingStart()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+            var checkedInAtUtc = new DateTime(2026, 7, 17, 0, 45, 0, DateTimeKind.Utc);
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.Include(u => u.Settings)
+                    .SingleAsync(u => u.Email == credentials.Email);
+                user.Settings!.TrackingStartSleepDate = "2026-07-18";
+                db.CheckIns.Add(new SleepyKoala.Api.Models.CheckIn
+                {
+                    UserId = user.Id,
+                    LocalCheckInDate = "2026-07-17",
+                    Status = "late",
+                    CreatedAtUtc = checkedInAtUtc
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
+
+            Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+            var recorded = Assert.Single(history!, item => item.Recorded);
+            Assert.Equal("2026-07-17", recorded.LocalCheckInDate);
+            Assert.Equal("late", recorded.Status);
+            Assert.Equal(checkedInAtUtc, recorded.CheckedInAtUtc);
+        }
+
         private static async Task<TestCredentials> RegisterUserAsync(HttpClient client)
         {
             var unique = Guid.NewGuid().ToString("N");

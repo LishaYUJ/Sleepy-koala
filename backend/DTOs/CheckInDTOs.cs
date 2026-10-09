@@ -29,5 +29,6 @@ namespace SleepyKoala.Api.DTOs
         public required string LocalCheckInDate { get; set; }
         public required string Status { get; set; }
         public bool Recorded { get; set; }
+        public DateTime? CheckedInAtUtc { get; set; }
     }
 }

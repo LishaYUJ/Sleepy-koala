@@ -71,6 +71,11 @@ namespace SleepyKoala.Api.Controllers
                 .Where(c => DateOnly.TryParseExact(c.LocalCheckInDate, "yyyy-MM-dd", out _))
                 .ToDictionary(c => c.LocalCheckInDate);
 
+            var firstRecordedDate = checkInsByDate.Keys
+                .Select(date => DateOnly.ParseExact(date, "yyyy-MM-dd"))
+                .OrderBy(date => date)
+                .FirstOrDefault();
+
             DateOnly trackingStart;
             if (DateOnly.TryParseExact(user.Settings.TrackingStartSleepDate, "yyyy-MM-dd", out var storedStart))
             {
@@ -78,13 +83,16 @@ namespace SleepyKoala.Api.Controllers
             }
             else
             {
-                var firstRecordedDate = checkInsByDate.Keys
-                    .Select(date => DateOnly.ParseExact(date, "yyyy-MM-dd"))
-                    .OrderBy(date => date)
-                    .FirstOrDefault();
                 trackingStart = firstRecordedDate == default
                     ? calendar.CurrentSleepDate
                     : firstRecordedDate;
+            }
+
+            // Never hide a real check-in because an older onboarding flow stored
+            // a tracking start date after the sleep day that the check-in belongs to.
+            if (firstRecordedDate != default && firstRecordedDate < trackingStart)
+            {
+                trackingStart = firstRecordedDate;
             }
 
             var latestRecordedDate = checkInsByDate.Keys
@@ -112,7 +120,8 @@ namespace SleepyKoala.Api.Controllers
                         Id = checkIn.Id,
                         LocalCheckInDate = dateKey,
                         Status = checkIn.Status,
-                        Recorded = true
+                        Recorded = true,
+                        CheckedInAtUtc = DateTime.SpecifyKind(checkIn.CreatedAtUtc, DateTimeKind.Utc)
                     });
                 }
                 else if (sleepDate <= calendar.LastClosedSleepDate)
@@ -122,7 +131,8 @@ namespace SleepyKoala.Api.Controllers
                         Id = null,
                         LocalCheckInDate = dateKey,
                         Status = "missing",
-                        Recorded = false
+                        Recorded = false,
+                        CheckedInAtUtc = null
                     });
                 }
             }

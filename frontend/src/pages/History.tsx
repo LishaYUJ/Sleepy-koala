@@ -56,6 +56,11 @@ export const History: React.FC = () => {
     [monthRecords],
   );
 
+  const bedtimeRecords = useMemo(
+    () => monthRecords.filter((item) => item.recorded),
+    [monthRecords],
+  );
+
   const calendarDays = useMemo(() => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
@@ -71,7 +76,7 @@ export const History: React.FC = () => {
     });
   }, [selectedMonth]);
 
-  const bedtimeMomentCount = monthRecords.filter((item) => item.recorded).length;
+  const bedtimeMomentCount = bedtimeRecords.length;
   const journeyCopy = bedtimeMomentCount === 0
     ? 'A quiet month so far. Koala will be here when you are ready tonight.'
     : `You shared ${bedtimeMomentCount} bedtime ${bedtimeMomentCount === 1 ? 'moment' : 'moments'} with Koala this month.`;
@@ -153,7 +158,7 @@ export const History: React.FC = () => {
         .journey-empty p { margin:0; line-height:1.55; }
         .journey-skeleton { height:84px; border-bottom:1px solid rgba(165,180,252,.08); background:linear-gradient(90deg,transparent,rgba(165,180,252,.045),transparent); background-size:200% 100%; animation:journey-shimmer 1.5s linear infinite; }
         @keyframes journey-shimmer { to { background-position:-200% 0; } }
-        @media (max-width:768px) { .journey-page { padding:62px 16px 92px; } .journey-header { margin-bottom:22px; } .journey-calendar-shell { padding:17px 12px 14px; border-radius:22px; } .journey-month-bar { align-items:flex-start; } .journey-month-copy p { max-width:230px; } .journey-legend { gap:8px 12px; } .journey-weekdays,.journey-calendar-grid { gap:4px; } .journey-day { min-height:58px; padding:6px; border-radius:12px; } .journey-day-moon { width:31px; height:31px; } .journey-day-moon .journey-status-main { width:23px; height:23px; } .journey-day-moon .journey-status-badge { width:12px; height:12px; padding:2px; } }
+        @media (max-width:768px) { .journey-page { padding:18px 16px 92px; } .journey-header { margin-bottom:22px; } .journey-calendar-shell { padding:17px 12px 14px; border-radius:22px; } .journey-month-bar { align-items:flex-start; } .journey-month-copy p { max-width:230px; } .journey-legend { gap:8px 12px; } .journey-weekdays,.journey-calendar-grid { gap:4px; } .journey-day { min-height:58px; padding:6px; border-radius:12px; } .journey-day-moon { width:31px; height:31px; } .journey-day-moon .journey-status-main { width:23px; height:23px; } .journey-day-moon .journey-status-badge { width:12px; height:12px; padding:2px; } }
         @media (max-width:480px) { .journey-title-icon { width:40px; height:40px; border-radius:13px; } .journey-month-copy p { font-size:.82rem; max-width:190px; } .journey-entry { grid-template-columns:46px minmax(0,1fr); gap:12px; } .journey-entry-state { grid-column:2; margin-top:-10px; } }
         @media (prefers-reduced-motion:reduce) { .journey-month-btn,.journey-skeleton { transition:none; animation:none; } }
       `}</style>
@@ -213,7 +218,7 @@ export const History: React.FC = () => {
         <div className="journey-nights-heading" id="journey-nights-title"><Sparkles size={17} /><span>Bedtime moments</span></div>
         {isLoading && history.length === 0 ? (
           <div aria-label="Loading sleep journey"><div className="journey-skeleton" /><div className="journey-skeleton" /><div className="journey-skeleton" /></div>
-        ) : monthRecords.length === 0 ? (
+        ) : bedtimeRecords.length === 0 ? (
           <div className="journey-empty">
             <div className="journey-empty-inner">
               <div className="journey-empty-icon"><CalendarDays size={27} /></div>
@@ -223,19 +228,21 @@ export const History: React.FC = () => {
           </div>
         ) : (
           <div className="journey-list">
-            {monthRecords.map((item) => {
+            {bedtimeRecords.map((item) => {
               const date = parseHistoryDate(item.localCheckInDate);
               const status = item.status as JourneyStatus;
               const isOnTime = status === 'onTime';
-              const isMissing = status === 'missing';
+              const checkedInTime = item.checkedInAtUtc
+                ? new Date(item.checkedInAtUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                : null;
               return (
-                <article className={`journey-entry ${isOnTime ? 'on-time' : isMissing ? 'missing' : 'late'}`} key={item.id || item.localCheckInDate}>
+                <article className={`journey-entry ${isOnTime ? 'on-time' : 'late'}`} key={item.id || item.localCheckInDate}>
                   <div className="journey-entry-symbol"><JourneyStatusMark status={status} /></div>
                   <div className="journey-entry-copy">
                     <h3>{date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
-                    <p>{isOnTime ? 'Koala settled in before your bedtime goal.' : isMissing ? 'No check-in was recorded before the sleep window closed.' : 'It was a later night, but you still made time to check in.'}</p>
+                    <p>{checkedInTime ? `Checked in at ${checkedInTime}. ` : ''}{isOnTime ? 'Koala settled in before your bedtime goal.' : 'It was a later night, but you still made time to check in.'}</p>
                   </div>
-                  <span className="journey-entry-state">{isOnTime ? 'Rested on time' : isMissing ? 'No check-in' : 'A later night'}</span>
+                  <span className="journey-entry-state">{isOnTime ? 'Rested on time' : 'A later night'}</span>
                 </article>
               );
             })}

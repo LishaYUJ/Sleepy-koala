@@ -67,6 +67,7 @@ export interface CheckInHistory {
   localCheckInDate: string;
   status: string;
   recorded: boolean;
+  checkedInAtUtc: string | null;
 }
 
 export interface LeaderRank {
@@ -417,8 +418,11 @@ export const useStore = create<AppState>((set, get) => ({
       );
       set({ isLoading: false });
       
-      // Reload summary following successful check-in
-      await get().loadSummary(response.localCheckInDate || getCurrentSleepDateString());
+      // Keep both dashboard and history views in sync with the completed check-in.
+      await Promise.all([
+        get().loadSummary(response.localCheckInDate || getCurrentSleepDateString()),
+        get().loadHistory(),
+      ]);
       return response;
     } catch (err: any) {
       set({ isLoading: false, error: err.body?.message || err.message });

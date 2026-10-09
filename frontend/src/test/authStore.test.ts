@@ -37,6 +37,8 @@ afterEach(() => {
     authPhase: 'idle',
     authErrorKind: null,
     error: null,
+    summary: null,
+    history: [],
   });
 });
 
@@ -137,5 +139,35 @@ describe('idempotent registration recovery', () => {
 
     expect(post).toHaveBeenCalledTimes(2);
     expect(post.mock.calls[0][1]).toEqual(post.mock.calls[1][1]);
+  });
+});
+
+describe('check-in history synchronization', () => {
+  it('reloads both the summary and history after a successful check-in', async () => {
+    const historyEntry = {
+      id: 'check-in-id',
+      localCheckInDate: '2026-10-09',
+      status: 'late',
+      recorded: true,
+      checkedInAtUtc: '2026-10-09T12:20:00Z',
+    };
+
+    useStore.setState({ token: 'token', history: [] });
+    vi.spyOn(api, 'post').mockResolvedValue({
+      checkInId: historyEntry.id,
+      localCheckInDate: historyEntry.localCheckInDate,
+      status: historyEntry.status,
+    });
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url === '/api/me/summary') return summaryResponse as any;
+      if (url === '/api/checkins/me') return [historyEntry] as any;
+      throw new Error(`Unexpected API request: ${url}`);
+    });
+
+    await useStore.getState().performCheckIn();
+
+    expect(get).toHaveBeenCalledWith('/api/me/summary', 'token');
+    expect(get).toHaveBeenCalledWith('/api/checkins/me', 'token');
+    expect(useStore.getState().history).toEqual([historyEntry]);
   });
 });

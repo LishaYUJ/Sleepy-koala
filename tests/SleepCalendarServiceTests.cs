@@ -29,10 +29,13 @@ public class SleepCalendarServiceTests
     }
 
     [Theory]
+    [InlineData(0, 30, "2026-07-16")]
+    [InlineData(2, 0, "2026-07-16")]
+    [InlineData(2, 1, "2026-07-17")]
     [InlineData(20, 59, "2026-07-17")]
-    [InlineData(21, 0, "2026-07-18")]
-    [InlineData(23, 30, "2026-07-18")]
-    public void Tracking_StartsAtTheNextFullCheckInWindow(
+    [InlineData(21, 0, "2026-07-17")]
+    [InlineData(23, 30, "2026-07-17")]
+    public void Tracking_StartsWithTheSleepDayAvailableAtSetup(
         int hour,
         int minute,
         string expectedStart)

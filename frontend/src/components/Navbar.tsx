@@ -195,6 +195,12 @@ export const Navbar: React.FC = () => {
             display: none;
           }
           .top-navbar-container {
+            position: relative;
+            top: auto;
+            left: auto;
+            right: auto;
+            flex: 0 0 72px;
+            height: 72px;
             padding: 0 20px;
           }
         }

@@ -52,8 +52,10 @@ public sealed class SleepCalendarService : ISleepCalendarService
         var localStartedAt = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
         var startDate = DateOnly.FromDateTime(localStartedAt);
 
-        // Only count sleep days whose full 21:00-02:00 window begins after setup.
-        return localStartedAt.TimeOfDay < CheckInStart ? startDate : startDate.AddDays(1);
+        // A sleep day begins at 21:00 and remains the same sleep day through 02:00.
+        // Starting during the after-midnight window therefore belongs to yesterday;
+        // all other setup times prepare the user for tonight's sleep day.
+        return localStartedAt.TimeOfDay <= CheckInEnd ? startDate.AddDays(-1) : startDate;
     }
 
     public bool IsValidTimeZone(string timeZoneId)

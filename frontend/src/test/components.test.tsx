@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlassCard } from '../components/GlassCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { Auth } from '../pages/Auth';
+import { History } from '../pages/History';
 import { Landing } from '../pages/Landing';
+import { api } from '../services/api';
 import { useStore } from '../stores/useStore';
 
 describe('Landing', () => {
@@ -34,6 +36,45 @@ describe('MobileBottomNav', () => {
     expect(screen.getByText('Leaderboard').closest('a')).toHaveAttribute('href', '/leaderboard');
     expect(screen.getByText('Badges').closest('a')).toHaveAttribute('href', '/badges');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
+  });
+});
+
+describe('History', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useStore.setState({ token: null, history: [], isLoading: false, error: null });
+  });
+
+  it('shows the actual check-in time in bedtime moments and keeps misses in the calendar only', () => {
+    const checkedInAtUtc = '2026-10-09T12:20:00Z';
+    const expectedTime = new Date(checkedInAtUtc).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const history = [
+      {
+        id: 'check-in-id',
+        localCheckInDate: '2026-10-09',
+        status: 'late',
+        recorded: true,
+        checkedInAtUtc,
+      },
+      {
+        id: null,
+        localCheckInDate: '2026-10-08',
+        status: 'missing',
+        recorded: false,
+        checkedInAtUtc: null,
+      },
+    ];
+
+    useStore.setState({ token: 'token', history, isLoading: false, error: null });
+    vi.spyOn(api, 'get').mockResolvedValue(history);
+
+    render(<History />);
+
+    expect(screen.getByText(new RegExp(`Checked in at ${expectedTime.replace('.', '\\.')}\\.`))).toBeInTheDocument();
+    expect(screen.queryByText(/No check-in was recorded before the sleep window closed/i)).not.toBeInTheDocument();
   });
 });
 
