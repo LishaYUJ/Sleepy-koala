@@ -94,9 +94,8 @@ export const History: React.FC = () => {
     <div className="journey-page">
       <style>{`
         .journey-page { width:100%; max-width:1080px; margin:0 auto; padding:20px 24px 88px; color:var(--text-main); }
-        .journey-header { display:flex; align-items:flex-start; gap:15px; margin-bottom:30px; }
-        .journey-title-icon { display:grid; flex:0 0 auto; width:46px; height:46px; place-items:center; border-radius:15px; color:#c7ccff; background:rgba(129,140,248,.13); border:1px solid rgba(165,180,252,.16); box-shadow:inset 0 1px 0 rgba(255,255,255,.05); }
-        .journey-header h1 { margin:0 0 7px; color:#f3edd7; font-size:clamp(1.85rem,3vw,2.5rem); line-height:1.05; font-weight:600; }
+        .journey-header { margin-bottom:30px; }
+        .journey-header h1 { margin:0 0 6px; color:#f3edd7; font-size:2rem; line-height:1.1; font-weight:600; }
         .journey-header p { margin:0; color:var(--text-muted); line-height:1.55; }
         .journey-calendar-shell { padding:clamp(18px,3vw,30px); border-radius:26px; background:rgba(8,11,28,.5); border:1px solid rgba(165,180,252,.1); box-shadow:0 20px 48px rgba(5,7,22,.28), inset 0 1px 0 rgba(255,255,255,.025); backdrop-filter:blur(16px); }
         .journey-month-bar { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:23px; }
@@ -158,17 +157,14 @@ export const History: React.FC = () => {
         .journey-empty p { margin:0; line-height:1.55; }
         .journey-skeleton { height:84px; border-bottom:1px solid rgba(165,180,252,.08); background:linear-gradient(90deg,transparent,rgba(165,180,252,.045),transparent); background-size:200% 100%; animation:journey-shimmer 1.5s linear infinite; }
         @keyframes journey-shimmer { to { background-position:-200% 0; } }
-        @media (max-width:768px) { .journey-page { padding:18px 16px 92px; } .journey-header { margin-bottom:22px; } .journey-calendar-shell { padding:17px 12px 14px; border-radius:22px; } .journey-month-bar { align-items:flex-start; } .journey-month-copy p { max-width:230px; } .journey-legend { gap:8px 12px; } .journey-weekdays,.journey-calendar-grid { gap:4px; } .journey-day { min-height:58px; padding:6px; border-radius:12px; } .journey-day-moon { width:31px; height:31px; } .journey-day-moon .journey-status-main { width:23px; height:23px; } .journey-day-moon .journey-status-badge { width:12px; height:12px; padding:2px; } }
-        @media (max-width:480px) { .journey-title-icon { width:40px; height:40px; border-radius:13px; } .journey-month-copy p { font-size:.82rem; max-width:190px; } .journey-entry { grid-template-columns:46px minmax(0,1fr); gap:12px; } .journey-entry-state { grid-column:2; margin-top:-10px; } }
+        @media (max-width:768px) { .journey-page { padding:62px 16px 92px; } .journey-header { margin-bottom:22px; } .journey-calendar-shell { padding:17px 12px 14px; border-radius:22px; } .journey-month-bar { align-items:flex-start; } .journey-month-copy p { max-width:230px; } .journey-legend { gap:8px 12px; } .journey-weekdays,.journey-calendar-grid { gap:4px; } .journey-day { min-height:58px; padding:6px; border-radius:12px; } .journey-day-moon { width:31px; height:31px; } .journey-day-moon .journey-status-main { width:23px; height:23px; } .journey-day-moon .journey-status-badge { width:12px; height:12px; padding:2px; } }
+        @media (max-width:480px) { .journey-month-copy p { font-size:.82rem; max-width:190px; } .journey-entry { grid-template-columns:46px minmax(0,1fr); gap:12px; } .journey-entry-state { grid-column:2; margin-top:-10px; } }
         @media (prefers-reduced-motion:reduce) { .journey-month-btn,.journey-skeleton { transition:none; animation:none; } }
       `}</style>
 
       <header className="journey-header">
-        <div className="journey-title-icon"><Moon size={23} /></div>
-        <div>
-          <h1>Your sleep journey</h1>
-          <p>A gentle look back at the nights you shared with Koala.</p>
-        </div>
+        <h1 className="brand-font">Your sleep journey</h1>
+        <p>A gentle look back at the nights you shared with Koala.</p>
       </header>
 
       <section className="journey-calendar-shell" aria-labelledby="journey-month-title">

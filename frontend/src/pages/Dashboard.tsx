@@ -213,6 +213,23 @@ export const Dashboard: React.FC = () => {
     : bedtimeState.mode;
   const bedtimeResultCopy = bedtimeResult[bedtimeResultMode];
 
+  const fallbackBadgeShelf = [
+    { name: 'First Sleep', isLocked: true },
+    { name: '3-Day Koala Care', isLocked: true },
+    { name: 'One Week Calm', isLocked: true },
+  ];
+  const mobileBadgeShelf = badges
+    ? [
+        ...badges.unlocked.map((badge) => ({ name: badge.name, isLocked: false })),
+        ...badges.locked.map((badge) => ({ name: badge.name, isLocked: true })),
+      ].slice(0, 3)
+    : fallbackBadgeShelf;
+  const unlockedBadgeCount = badges?.unlocked.length ?? 0;
+  const totalBadgeCount = Math.max(
+    3,
+    (badges?.unlocked.length ?? 0) + (badges?.locked.length ?? 0),
+  );
+
   // One fatigue point removes one of ten visible energy hearts.
   const fatigueScore = summary?.fatigueScore ?? 0;
   const energyHearts = Math.max(0, Math.min(10, 10 - fatigueScore));
@@ -1260,6 +1277,116 @@ export const Dashboard: React.FC = () => {
             text-wrap: balance;
           }
 
+          .mobile-badge-shelf {
+            position: relative;
+            display: flex;
+            width: min(250px, 72vw);
+            margin: 1px 0 16px;
+            padding: 0 14px 23px;
+            flex-direction: column;
+            align-items: center;
+            border: 0;
+            color: inherit;
+            background: transparent;
+            cursor: pointer;
+            isolation: isolate;
+          }
+
+          .mobile-badge-shelf::before {
+            content: '';
+            position: absolute;
+            right: 2px;
+            bottom: 15px;
+            left: 2px;
+            height: 11px;
+            border: 1px solid rgba(243, 220, 184, 0.24);
+            border-radius: 4px 4px 8px 8px;
+            background: #59413f;
+            box-shadow:
+              0 5px 0 #2e232b,
+              0 11px 18px rgba(7, 8, 24, 0.4),
+              inset 0 2px 0 rgba(255, 235, 201, 0.15);
+            z-index: -1;
+          }
+
+          .mobile-badge-shelf::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 30px;
+            width: 18px;
+            height: 13px;
+            border-right: 4px solid #3b2d34;
+            border-bottom: 4px solid #3b2d34;
+            border-radius: 0 0 5px;
+            box-shadow: 168px 0 0 -4px #3b2d34;
+            transform: skewX(-10deg);
+            z-index: -2;
+          }
+
+          .mobile-badge-shelf:focus-visible {
+            outline: 2px solid rgba(224, 216, 255, 0.88);
+            outline-offset: 5px;
+            border-radius: 12px;
+          }
+
+          .mobile-badge-shelf:active {
+            transform: translateY(1px);
+          }
+
+          .mobile-badge-shelf-label {
+            display: flex;
+            width: 100%;
+            margin-bottom: 2px;
+            align-items: baseline;
+            justify-content: space-between;
+            color: rgba(226, 220, 211, 0.82);
+            font-family: var(--font-body);
+            font-size: 0.68rem;
+            font-weight: 650;
+            letter-spacing: 0.035em;
+          }
+
+          .mobile-badge-shelf-label strong {
+            color: #f3edd7;
+            font-size: 0.7rem;
+            font-variant-numeric: tabular-nums;
+          }
+
+          .mobile-badge-shelf-row {
+            display: flex;
+            height: 54px;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 13px;
+          }
+
+          .mobile-badge-shelf-item {
+            display: grid;
+            width: 48px;
+            height: 48px;
+            place-items: center;
+            filter: drop-shadow(0 5px 7px rgba(7, 8, 24, 0.38));
+            transform-origin: center bottom;
+            transition: transform 0.22s ease, filter 0.22s ease;
+          }
+
+          .mobile-badge-shelf-item.locked {
+            opacity: 0.42;
+            filter: grayscale(0.32) drop-shadow(0 4px 5px rgba(7, 8, 24, 0.26));
+          }
+
+          .mobile-badge-shelf-item svg {
+            width: 48px;
+            height: 48px;
+          }
+
+          .mobile-badge-shelf:hover .mobile-badge-shelf-item:not(.locked),
+          .mobile-badge-shelf:focus-visible .mobile-badge-shelf-item:not(.locked) {
+            transform: translateY(-3px) rotate(-2deg);
+            filter: drop-shadow(0 8px 9px rgba(7, 8, 24, 0.44));
+          }
+
           .progress-container {
             width: 100%;
             padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
@@ -1818,28 +1945,6 @@ export const Dashboard: React.FC = () => {
                 <div className="eucalyptus-leaf" style={{ top: '45%', left: '88%', animationDelay: '7s' }}>🌿</div>
               </div>
 
-              {/* Top-Left Badges Showcase (Icon-only badges display) */}
-              <div 
-                className="mobile-top-badges-container"
-                onClick={() => navigate('/badges')}
-                title="View Badges Museum"
-                style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 30 }}
-              >
-                <div className="badge-icons-row">
-                  {badges?.unlocked && badges.unlocked.length > 0 ? (
-                    badges.unlocked.slice(0, 3).map((b, i) => (
-                      <div key={i} className="badge-mini-shield" title={b.name} style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <BadgeGraphic name={b.name} isLocked={false} />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="badge-mini-shield" title="Locked Badges" style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <BadgeGraphic name="First Sleep" isLocked={true} />
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Restore the original serif greeting hierarchy; it yields to energy on tap. */}
               {!isKoalaStatusOpen && (
                 <div className="mobile-greeting-copy">
@@ -1858,6 +1963,29 @@ export const Dashboard: React.FC = () => {
                 <Moon size={15} color="#a78bfa" />
                 <span>Bedtime goal: {formatCutoff12h(summary?.cutoffTime)}</span>
               </div>
+
+              <button
+                type="button"
+                className="mobile-badge-shelf"
+                onClick={() => navigate('/badges')}
+                aria-label={`View achievements. ${unlockedBadgeCount} of ${totalBadgeCount} badges unlocked.`}
+              >
+                <span className="mobile-badge-shelf-label">
+                  <span>Bedtime keepsakes</span>
+                  <strong>{unlockedBadgeCount}/{totalBadgeCount}</strong>
+                </span>
+                <span className="mobile-badge-shelf-row" aria-hidden="true">
+                  {mobileBadgeShelf.map((badge, index) => (
+                    <span
+                      className={`mobile-badge-shelf-item${badge.isLocked ? ' locked' : ''}`}
+                      key={`${badge.name}-${index}`}
+                      title={badge.name}
+                    >
+                      <BadgeGraphic name={badge.name} isLocked={badge.isLocked} />
+                    </span>
+                  ))}
+                </span>
+              </button>
 
               {/* Tap mirrors the desktop hover/focus interaction. */}
               {renderKoalaStatus('mobile')}
