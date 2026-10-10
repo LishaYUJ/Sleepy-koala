@@ -161,7 +161,28 @@ describe('Auth connection states', () => {
     useStore.setState({ authPhase: 'idle', authErrorKind: null, error: null });
   });
 
-  it('keeps recovery details simple for the user', () => {
+  it('uses koala-focused loading copy while signing in', () => {
+    useStore.setState({
+      isLoading: true,
+      isWakingServer: true,
+      authPhase: 'waking',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Auth />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Finding your koala');
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'aria-label',
+      'Finding your koala. Please wait.',
+    );
+    expect(screen.getByRole('button', { name: /please wait/i })).toBeDisabled();
+  });
+
+  it('keeps registration recovery details simple for the user', () => {
     useStore.setState({
       isLoading: true,
       isWakingServer: true,
@@ -174,7 +195,11 @@ describe('Auth connection states', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('Starting the server…');
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing for your koala’s arrival');
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'aria-label',
+      'Preparing for your koala’s arrival. Please wait.',
+    );
     expect(screen.getByRole('button', { name: /please wait/i })).toBeDisabled();
   });
 

@@ -315,3 +315,36 @@ The production frontend, backend, and Azure SQL schema now support idempotent re
 - Continue monitoring `/health`, Azure application logs, registration outcomes, and CORS responses after deployment.
 
 ---
+
+## Date: 2026-10-11
+
+**Change:** Replaced technical authentication loading copy with koala-focused progress feedback
+
+### User experience issue
+
+The authentication status `Starting the server…` described an internal implementation detail. It sounded like developer-facing diagnostics rather than part of the Sleepy Koala experience.
+
+### Changes
+
+- Login waiting now displays `Finding your koala`.
+- Registration waiting and safe recovery now display `Preparing for your koala’s arrival`.
+- Login submission continues with `Signing you in`.
+- Registration submission continues with `Creating your account`.
+- Every loading message now has three sequentially fading dots to communicate ongoing progress without changing layout width.
+- Users who prefer reduced motion see three static dots.
+- Screen readers receive a stable message ending with `Please wait.` instead of repeated animated-dot announcements.
+- Developer health-check and retry diagnostics remain in the browser console and are not exposed in the user-facing copy.
+
+### Verification
+
+- Frontend component tests: 9 passed in the targeted test file.
+- Complete frontend test suite: 75 passed.
+- TypeScript compilation and Vite production build passed.
+- Frontend lint completed with the same three pre-existing warnings in unrelated files.
+- `git diff --check` passed.
+
+### Deployment status
+
+This user-interface change is implemented locally and has not yet been committed or deployed.
+
+---

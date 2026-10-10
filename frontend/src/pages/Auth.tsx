@@ -84,11 +84,13 @@ export const Auth: React.FC = () => {
   };
 
   const statusMessage = authPhase === 'waking' || authPhase === 'recovering'
-    ? 'Starting the server…'
+    ? isLogin
+      ? 'Finding your koala'
+      : 'Preparing for your koala’s arrival'
     : authPhase === 'submitting'
       ? isLogin
-        ? 'Signing you in…'
-        : 'Creating your account…'
+        ? 'Signing you in'
+        : 'Creating your account'
       : null;
 
   return (
@@ -171,6 +173,37 @@ export const Auth: React.FC = () => {
           text-align: left;
         }
 
+        .auth-loading-dots {
+          display: inline-flex;
+          width: 1.5em;
+          justify-content: flex-start;
+        }
+
+        .auth-loading-dot {
+          opacity: 0.24;
+          animation: auth-loading-dot 1.2s ease-in-out infinite;
+        }
+
+        .auth-loading-dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .auth-loading-dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        @keyframes auth-loading-dot {
+          0%, 60%, 100% { opacity: 0.24; }
+          30% { opacity: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .auth-loading-dot {
+            opacity: 1;
+            animation: none;
+          }
+        }
+
         .auth-error-action {
           display: inline-block;
           margin-top: 8px;
@@ -223,8 +256,20 @@ export const Auth: React.FC = () => {
         </p>
 
         {statusMessage && (
-          <div className="auth-status" role="status" aria-live="polite">
-            {statusMessage}
+          <div
+            className="auth-status"
+            role="status"
+            aria-live="polite"
+            aria-label={`${statusMessage}. Please wait.`}
+          >
+            <span aria-hidden="true">
+              {statusMessage}
+              <span className="auth-loading-dots">
+                <span className="auth-loading-dot">.</span>
+                <span className="auth-loading-dot">.</span>
+                <span className="auth-loading-dot">.</span>
+              </span>
+            </span>
           </div>
         )}
 
