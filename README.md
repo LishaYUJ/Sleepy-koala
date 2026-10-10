@@ -8,7 +8,7 @@ Users set a bedtime goal, check in before sleep, and care for a koala whose ener
 
 **[Open the live application](https://my-sleepy-koala.vercel.app)** · **[API health](https://sleepy-koala-lisa.azurewebsites.net/health)** · **[API documentation](https://sleepy-koala-lisa.azurewebsites.net/scalar/v1)**
 
-![Sleepy Koala bedtime sanctuary](frontend/src/assets/landingpage.png)
+![Sleepy Koala landing page](docs/images/landing-page.png)
 
 ## What makes the project technically interesting
 
@@ -161,7 +161,9 @@ The application is intentionally sized for a low-traffic personal product rather
 
 AI was used across planning, UI iteration, implementation, debugging, test design, migration review, Docker configuration, and production investigation. Suggestions were not accepted as evidence by themselves: changes were checked against the running application, automated tests, rendered UI, database schema, deployment responses, and live HTTP behaviour.
 
+<!--
 Prompt summaries and outcomes are recorded in [specs/ai-prompts.md](specs/ai-prompts.md); the constraints supplied to the coding agent are recorded in [specs/agent-instructions.md](specs/agent-instructions.md).
+-->
 
 ## Additional documentation
 
