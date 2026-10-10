@@ -6,7 +6,7 @@ Sleepy Koala is a full-stack bedtime habit application. Users set a bedtime goal
 
 ## Deployment
 
-- Frontend: [https://msa-sleepy-koala.vercel.app](https://msa-sleepy-koala.vercel.app)
+- Frontend: [https://my-sleepy-koala.vercel.app](https://my-sleepy-koala.vercel.app)
 - Backend health check: [https://sleepy-koala-lisa.azurewebsites.net/health](https://sleepy-koala-lisa.azurewebsites.net/health)
 - Scalar API documentation: [https://sleepy-koala-lisa.azurewebsites.net/scalar/v1](https://sleepy-koala-lisa.azurewebsites.net/scalar/v1)
 

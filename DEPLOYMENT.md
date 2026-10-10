@@ -4,7 +4,7 @@ The application keeps local development and Azure production configuration separ
 
 - Local development uses SQLite and the Vite `/api` proxy.
 - Azure production uses SQL Server and secrets supplied by App Service settings.
-- The production frontend is `https://msa-sleepy-koala.vercel.app`.
+- The production frontend is `https://my-sleepy-koala.vercel.app`.
 
 ## Azure App Service settings
 
@@ -18,7 +18,7 @@ Add these under **App Service > Settings > Environment variables**. Never commit
 | `Jwt__Key` | A new random secret of at least 32 bytes |
 | `Jwt__Issuer` | `SleepyKoalaApi` |
 | `Jwt__Audience` | `SleepyKoalaClient` |
-| `Cors__AllowedOrigins__0` | `https://msa-sleepy-koala.vercel.app` |
+| `Cors__AllowedOrigins__0` | `https://my-sleepy-koala.vercel.app` |
 
 Enable **HTTPS Only** and configure the App Service health check path as `/health`.
 

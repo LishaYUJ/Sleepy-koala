@@ -102,7 +102,7 @@ namespace SleepyKoala.Tests
         [Fact]
         public async Task CorsPreflight_AllowsProductionFrontend()
         {
-            const string origin = "https://msa-sleepy-koala.vercel.app";
+            const string origin = "https://my-sleepy-koala.vercel.app";
             var client = _factory.CreateClient();
             var request = new HttpRequestMessage(HttpMethod.Options, "/api/auth/login");
             request.Headers.Add("Origin", origin);

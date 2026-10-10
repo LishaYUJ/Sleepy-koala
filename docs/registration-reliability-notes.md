@@ -28,14 +28,14 @@ CORS（Cross-Origin Resource Sharing）是浏览器执行的跨域访问规则�
 Sleepy Koala 的两个 origin 不同：
 
 ```text
-前端：https://msa-sleepy-koala.vercel.app
+前端：https://my-sleepy-koala.vercel.app
 后端：https://sleepy-koala-lisa.azurewebsites.net
 ```
 
 浏览器要求后端响应包含类似下面的头：
 
 ```http
-Access-Control-Allow-Origin: https://msa-sleepy-koala.vercel.app
+Access-Control-Allow-Origin: https://my-sleepy-koala.vercel.app
 ```
 
 如果缺少这个头，即使服务器真的返回了内容，浏览器也可能不允许前端 JavaScript 读取。
