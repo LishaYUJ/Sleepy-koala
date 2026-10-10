@@ -446,6 +446,16 @@ namespace SleepyKoala.Tests
             var credentials = await RegisterUserAsync(client);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
 
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.Include(u => u.Settings)
+                    .SingleAsync(u => u.Email == credentials.Email);
+                user.CreatedAtUtc = new DateTime(2026, 7, 16, 10, 0, 0, DateTimeKind.Utc);
+                user.Settings!.TrackingStartSleepDate = "2026-07-16";
+                await db.SaveChangesAsync();
+            }
+
             var historyResponse = await client.GetAsync("/api/CheckIns/me");
 
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
@@ -455,6 +465,68 @@ namespace SleepyKoala.Tests
             Assert.Equal("missing", missing.Status);
             Assert.False(missing.Recorded);
             Assert.Null(missing.Id);
+        }
+
+        [Fact]
+        public async Task History_PausesMissingInferenceAfterSevenConsecutiveNights()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.Include(u => u.Settings)
+                    .SingleAsync(u => u.Email == credentials.Email);
+                user.CreatedAtUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc);
+                user.Settings!.TrackingStartSleepDate = null;
+                await db.SaveChangesAsync();
+            }
+
+            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
+
+            Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+            Assert.NotNull(history);
+            Assert.Equal(7, history!.Count(item => item.Status == "missing"));
+            Assert.Contains(history!, item => item.LocalCheckInDate == "2026-06-01");
+            Assert.Contains(history!, item => item.LocalCheckInDate == "2026-06-07");
+            Assert.DoesNotContain(history!, item => item.LocalCheckInDate == "2026-06-08");
+        }
+
+        [Fact]
+        public async Task History_ResumesMissingInferenceAfterARealCheckIn()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.Include(u => u.Settings)
+                    .SingleAsync(u => u.Email == credentials.Email);
+                user.CreatedAtUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc);
+                user.Settings!.TrackingStartSleepDate = null;
+                db.CheckIns.Add(new SleepyKoala.Api.Models.CheckIn
+                {
+                    UserId = user.Id,
+                    LocalCheckInDate = "2026-07-10",
+                    Status = "onTime",
+                    CreatedAtUtc = new DateTime(2026, 7, 10, 10, 0, 0, DateTimeKind.Utc)
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
+
+            Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+            Assert.NotNull(history);
+            Assert.Contains(history!, item => item.Recorded && item.LocalCheckInDate == "2026-07-10");
+            Assert.Equal(13, history!.Count(item => item.Status == "missing"));
+            Assert.Contains(history!, item => item.LocalCheckInDate == "2026-07-16" && item.Status == "missing");
         }
 
         [Fact]

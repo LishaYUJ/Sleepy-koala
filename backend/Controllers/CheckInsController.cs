@@ -13,6 +13,7 @@ namespace SleepyKoala.Api.Controllers
     [Route("api/[controller]")]
     public class CheckInsController : ControllerBase
     {
+        private const int MaxConsecutiveMissingNights = 7;
         private readonly ICheckInService _checkInService;
         private readonly ApplicationDbContext _context;
         private readonly ISleepCalendarService _sleepCalendar;
@@ -76,16 +77,22 @@ namespace SleepyKoala.Api.Controllers
                 .OrderBy(date => date)
                 .FirstOrDefault();
 
+            var fairRegistrationStart = _sleepCalendar
+                .GetInitialTrackingStartSleepDate(user.Settings, user.CreatedAtUtc);
+
             DateOnly trackingStart;
             if (DateOnly.TryParseExact(user.Settings.TrackingStartSleepDate, "yyyy-MM-dd", out var storedStart))
             {
-                trackingStart = storedStart;
+                // Older onboarding logic could start tracking the previous sleep
+                // day for users who registered after midnight. Never infer a miss
+                // before the fair start calculated from their registration time.
+                trackingStart = storedStart > fairRegistrationStart
+                    ? storedStart
+                    : fairRegistrationStart;
             }
             else
             {
-                trackingStart = firstRecordedDate == default
-                    ? calendar.CurrentSleepDate
-                    : firstRecordedDate;
+                trackingStart = fairRegistrationStart;
             }
 
             // Never hide a real check-in because an older onboarding flow stored
@@ -110,6 +117,7 @@ namespace SleepyKoala.Api.Controllers
             }
 
             var history = new List<CheckInHistoryDto>();
+            var consecutiveMissingNights = 0;
             for (var sleepDate = trackingStart; sleepDate <= lastDate; sleepDate = sleepDate.AddDays(1))
             {
                 var dateKey = sleepDate.ToString("yyyy-MM-dd");
@@ -123,17 +131,23 @@ namespace SleepyKoala.Api.Controllers
                         Recorded = true,
                         CheckedInAtUtc = DateTime.SpecifyKind(checkIn.CreatedAtUtc, DateTimeKind.Utc)
                     });
+                    consecutiveMissingNights = 0;
                 }
                 else if (sleepDate <= calendar.LastClosedSleepDate)
                 {
-                    history.Add(new CheckInHistoryDto
+                    if (consecutiveMissingNights < MaxConsecutiveMissingNights)
                     {
-                        Id = null,
-                        LocalCheckInDate = dateKey,
-                        Status = "missing",
-                        Recorded = false,
-                        CheckedInAtUtc = null
-                    });
+                        history.Add(new CheckInHistoryDto
+                        {
+                            Id = null,
+                            LocalCheckInDate = dateKey,
+                            Status = "missing",
+                            Recorded = false,
+                            CheckedInAtUtc = null
+                        });
+                    }
+
+                    consecutiveMissingNights++;
                 }
             }
 

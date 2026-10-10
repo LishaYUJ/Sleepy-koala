@@ -41,11 +41,14 @@ describe('MobileBottomNav', () => {
 
 describe('History', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     useStore.setState({ token: null, history: [], isLoading: false, error: null });
   });
 
-  it('shows the actual check-in time in bedtime moments and keeps misses in the calendar only', () => {
+  it('shows check-ins and interspersed misses from the seven most recent sleep days', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10, 10, 0, 0));
     const checkedInAtUtc = '2026-10-09T12:20:00Z';
     const expectedTime = new Date(checkedInAtUtc).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -74,7 +77,57 @@ describe('History', () => {
     render(<History />);
 
     expect(screen.getByText(new RegExp(`Checked in at ${expectedTime.replace('.', '\\.')}\\.`))).toBeInTheDocument();
-    expect(screen.queryByText(/No check-in was recorded before the sleep window closed/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/No bedtime check-in was recorded for this sleep day/i)).toBeInTheDocument();
+    expect(screen.getByText(/up to 7 consecutive days/i)).toBeInTheDocument();
+  });
+
+  it('collapses seven fully missed sleep days into one quiet recent-status message', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10, 10, 0, 0));
+    const history = Array.from({ length: 7 }, (_, index) => ({
+      id: null,
+      localCheckInDate: `2026-10-${String(9 - index).padStart(2, '0')}`,
+      status: 'missing',
+      recorded: false,
+      checkedInAtUtc: null,
+    }));
+
+    useStore.setState({ token: 'token', history, isLoading: false, error: null });
+    vi.spyOn(api, 'get').mockResolvedValue(history);
+
+    render(<History />);
+
+    expect(screen.getByText('No check-in lately')).toBeInTheDocument();
+    expect(screen.queryByText(/No bedtime check-in was recorded for this sleep day/i)).not.toBeInTheDocument();
+  });
+
+  it('limits bedtime moments to the seven latest sleep dates', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10, 10, 0, 0));
+    const history = [
+      {
+        id: 'recent',
+        localCheckInDate: '2026-10-09',
+        status: 'onTime',
+        recorded: true,
+        checkedInAtUtc: '2026-10-09T10:00:00Z',
+      },
+      {
+        id: 'older',
+        localCheckInDate: '2026-10-02',
+        status: 'onTime',
+        recorded: true,
+        checkedInAtUtc: '2026-10-02T10:00:00Z',
+      },
+    ];
+
+    useStore.setState({ token: 'token', history, isLoading: false, error: null });
+    vi.spyOn(api, 'get').mockResolvedValue(history);
+
+    render(<History />);
+
+    expect(screen.getByText(/Friday, October 9/)).toBeInTheDocument();
+    expect(screen.queryByText(/Friday, October 2/)).not.toBeInTheDocument();
   });
 });
 

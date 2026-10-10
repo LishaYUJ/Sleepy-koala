@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Circle, CircleDashed, Clock3, Moon, Sparkles } from 'lucide-react';
-import { useStore } from '../stores/useStore';
+import { useStore, type CheckInHistory } from '../stores/useStore';
 
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -14,6 +14,18 @@ const toDateKey = (date: Date) => {
 const parseHistoryDate = (dateString: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day);
+};
+
+const shiftDate = (date: Date, days: number) => {
+  const shifted = new Date(date);
+  shifted.setDate(shifted.getDate() + days);
+  return shifted;
+};
+
+const getLastClosedSleepDate = (now: Date) => {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const calendarDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return shiftDate(calendarDate, minutes <= 2 * 60 ? -2 : -1);
 };
 
 type JourneyStatus = 'onTime' | 'late' | 'missing';
@@ -32,7 +44,7 @@ const JourneyStatusMark: React.FC<{ status: JourneyStatus; compact?: boolean }> 
 
 export const History: React.FC = () => {
   const { history, loadHistory, isLoading, error, setError } = useStore();
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
 
   useEffect(() => {
@@ -56,10 +68,45 @@ export const History: React.FC = () => {
     [monthRecords],
   );
 
-  const bedtimeRecords = useMemo(
+  const monthCheckIns = useMemo(
     () => monthRecords.filter((item) => item.recorded),
     [monthRecords],
   );
+
+  const allRecordsByDate = useMemo(
+    () => new Map(history.map((item) => [item.localCheckInDate, item])),
+    [history],
+  );
+
+  const latestRecordedDate = useMemo(
+    () => history
+      .filter((item) => item.recorded)
+      .map((item) => item.localCheckInDate)
+      .sort((a, b) => b.localeCompare(a))[0],
+    [history],
+  );
+
+  const recentSleepDays = useMemo(() => {
+    const lastClosed = getLastClosedSleepDate(now);
+    const latestRecorded = latestRecordedDate ? parseHistoryDate(latestRecordedDate) : null;
+    const windowEnd = latestRecorded && latestRecorded > lastClosed ? latestRecorded : lastClosed;
+
+    return Array.from({ length: 7 }, (_, index) => toDateKey(shiftDate(windowEnd, -index)));
+  }, [latestRecordedDate, now]);
+
+  const recentMomentRecords = useMemo(
+    () => recentSleepDays
+      .map((dateKey) => allRecordsByDate.get(dateKey))
+      .filter((item): item is CheckInHistory => Boolean(item)),
+    [allRecordsByDate, recentSleepDays],
+  );
+
+  const recentCheckIns = useMemo(
+    () => recentMomentRecords.filter((item) => item.recorded),
+    [recentMomentRecords],
+  );
+
+  const showNoCheckInLately = recentCheckIns.length === 0 && history.length > 0;
 
   const calendarDays = useMemo(() => {
     const year = selectedMonth.getFullYear();
@@ -76,7 +123,7 @@ export const History: React.FC = () => {
     });
   }, [selectedMonth]);
 
-  const bedtimeMomentCount = bedtimeRecords.length;
+  const bedtimeMomentCount = monthCheckIns.length;
   const journeyCopy = bedtimeMomentCount === 0
     ? 'A quiet month so far. Koala will be here when you are ready tonight.'
     : `You shared ${bedtimeMomentCount} bedtime ${bedtimeMomentCount === 1 ? 'moment' : 'moments'} with Koala this month.`;
@@ -101,8 +148,9 @@ export const History: React.FC = () => {
         .journey-month-bar { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:23px; }
         .journey-month-copy h2 { margin:0 0 6px; color:#f3edd7; font:600 clamp(1.25rem,2vw,1.55rem) var(--font-serif); }
         .journey-month-copy p { margin:0; color:#a4afc5; font-size:.92rem; line-height:1.5; }
-        .journey-legend { display:flex; flex-wrap:wrap; gap:10px 18px; margin:18px 0 16px; color:#8e9bb4; font-size:.78rem; }
+        .journey-legend { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; margin:18px 0 16px; color:#8e9bb4; font-size:.78rem; }
         .journey-legend-item { display:inline-flex; align-items:center; gap:7px; }
+        .journey-legend-rule { display:inline-flex; min-height:25px; align-items:center; color:#707c98; font-size:.72rem; line-height:1.35; }
         .journey-month-controls { display:flex; gap:8px; }
         .journey-month-btn { display:grid; width:40px; height:40px; place-items:center; border-radius:13px; border:1px solid rgba(165,180,252,.12); color:#b8c0e2; background:rgba(129,140,248,.07); cursor:pointer; transition:background .2s ease,color .2s ease,transform .2s ease; }
         .journey-month-btn:hover:not(:disabled) { color:#f3edd7; background:rgba(129,140,248,.16); transform:translateY(-1px); }
@@ -139,6 +187,10 @@ export const History: React.FC = () => {
         .journey-nights { margin-top:34px; }
         .journey-nights-heading { display:flex; align-items:center; gap:9px; margin-bottom:15px; color:#f3edd7; font:600 1.25rem var(--font-serif); }
         .journey-nights-heading svg { color:#a5b4fc; }
+        .journey-recent-note { display:flex; align-items:center; gap:13px; margin-bottom:14px; padding:15px 16px; border-radius:17px; color:#a9b3c9; background:rgba(104,116,148,.055); border:1px solid rgba(104,116,148,.11); }
+        .journey-recent-note-icon { display:grid; width:39px; height:39px; flex:0 0 auto; place-items:center; border-radius:13px; color:#8994ad; background:rgba(104,116,148,.09); }
+        .journey-recent-note strong { display:block; margin-bottom:2px; color:#ded9ce; font-size:.94rem; font-weight:650; }
+        .journey-recent-note span { font-size:.82rem; line-height:1.45; }
         .journey-list { display:flex; flex-direction:column; }
         .journey-entry { display:grid; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; gap:16px; min-height:84px; padding:15px 6px; border-bottom:1px solid rgba(165,180,252,.08); }
         .journey-entry:first-child { border-top:1px solid rgba(165,180,252,.08); }
@@ -205,6 +257,7 @@ export const History: React.FC = () => {
           <span className="journey-legend-item"><JourneyStatusMark status="onTime" compact /><span>Rested on time</span></span>
           <span className="journey-legend-item"><JourneyStatusMark status="late" compact /><span>A later night</span></span>
           <span className="journey-legend-item"><JourneyStatusMark status="missing" compact /><span>No check-in</span></span>
+          <span className="journey-legend-rule">Missing nights are tracked for up to 7 consecutive days, then pause until your next check-in.</span>
         </div>
 
         {error && <div className="journey-error" role="alert"><span>{error}</span><button type="button" onClick={retry}>Try again</button></div>}
@@ -212,9 +265,18 @@ export const History: React.FC = () => {
 
       <section className="journey-nights" aria-labelledby="journey-nights-title">
         <div className="journey-nights-heading" id="journey-nights-title"><Sparkles size={17} /><span>Bedtime moments</span></div>
+        {showNoCheckInLately && (
+          <div className="journey-recent-note" role="status">
+            <div className="journey-recent-note-icon"><CircleDashed size={22} /></div>
+            <div>
+              <strong>No check-in lately</strong>
+              <span>Your recent sleep days were quiet. Your next check-in will restart the journey.</span>
+            </div>
+          </div>
+        )}
         {isLoading && history.length === 0 ? (
           <div aria-label="Loading sleep journey"><div className="journey-skeleton" /><div className="journey-skeleton" /><div className="journey-skeleton" /></div>
-        ) : bedtimeRecords.length === 0 ? (
+        ) : showNoCheckInLately ? null : recentMomentRecords.length === 0 ? (
           <div className="journey-empty">
             <div className="journey-empty-inner">
               <div className="journey-empty-icon"><CalendarDays size={27} /></div>
@@ -224,21 +286,22 @@ export const History: React.FC = () => {
           </div>
         ) : (
           <div className="journey-list">
-            {bedtimeRecords.map((item) => {
+            {recentMomentRecords.map((item) => {
               const date = parseHistoryDate(item.localCheckInDate);
               const status = item.status as JourneyStatus;
               const isOnTime = status === 'onTime';
+              const isMissing = status === 'missing';
               const checkedInTime = item.checkedInAtUtc
                 ? new Date(item.checkedInAtUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
                 : null;
               return (
-                <article className={`journey-entry ${isOnTime ? 'on-time' : 'late'}`} key={item.id || item.localCheckInDate}>
+                <article className={`journey-entry ${isOnTime ? 'on-time' : isMissing ? 'missing' : 'late'}`} key={item.id || item.localCheckInDate}>
                   <div className="journey-entry-symbol"><JourneyStatusMark status={status} /></div>
                   <div className="journey-entry-copy">
                     <h3>{date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
-                    <p>{checkedInTime ? `Checked in at ${checkedInTime}. ` : ''}{isOnTime ? 'Koala settled in before your bedtime goal.' : 'It was a later night, but you still made time to check in.'}</p>
+                    <p>{isMissing ? 'No bedtime check-in was recorded for this sleep day.' : <>{checkedInTime ? `Checked in at ${checkedInTime}. ` : ''}{isOnTime ? 'Koala settled in before your bedtime goal.' : 'It was a later night, but you still made time to check in.'}</>}</p>
                   </div>
-                  <span className="journey-entry-state">{isOnTime ? 'Rested on time' : 'A later night'}</span>
+                  <span className="journey-entry-state">{isOnTime ? 'Rested on time' : isMissing ? 'No check-in' : 'A later night'}</span>
                 </article>
               );
             })}

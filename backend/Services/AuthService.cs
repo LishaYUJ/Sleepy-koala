@@ -31,15 +31,18 @@ namespace SleepyKoala.Api.Services
         private readonly ApplicationDbContext _context;
         private readonly JwtSettings _jwtSettings;
         private readonly ILogger<AuthService> _logger;
+        private readonly TimeProvider _timeProvider;
 
         public AuthService(
             ApplicationDbContext context,
             JwtSettings jwtSettings,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            TimeProvider timeProvider)
         {
             _context = context;
             _jwtSettings = jwtSettings;
             _logger = logger;
+            _timeProvider = timeProvider;
         }
 
         public async Task<RegistrationResult> RegisterAsync(RegisterRequest request)
@@ -73,7 +76,8 @@ namespace SleepyKoala.Api.Services
                 Email = normalizedEmail,
                 Nickname = request.Nickname,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                RegistrationAttemptId = request.RegistrationAttemptId
+                RegistrationAttemptId = request.RegistrationAttemptId,
+                CreatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime
             };
             
             var settings = new UserSettings

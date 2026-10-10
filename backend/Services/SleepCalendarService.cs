@@ -12,6 +12,7 @@ public interface ISleepCalendarService
 {
     SleepCalendarContext GetContext(UserSettings settings);
     DateOnly GetTrackingStartSleepDate(UserSettings settings, DateTime startedAtUtc);
+    DateOnly GetInitialTrackingStartSleepDate(UserSettings settings, DateTime startedAtUtc);
     bool IsValidTimeZone(string timeZoneId);
 }
 
@@ -45,17 +46,31 @@ public sealed class SleepCalendarService : ISleepCalendarService
             return storedDate;
         }
 
+        return GetInitialTrackingStartSleepDate(settings, startedAtUtc);
+    }
+
+    public DateOnly GetInitialTrackingStartSleepDate(UserSettings settings, DateTime startedAtUtc)
+    {
+
         var timeZone = ResolveTimeZone(settings.TimeZoneId);
         var utc = startedAtUtc.Kind == DateTimeKind.Utc
             ? startedAtUtc
             : DateTime.SpecifyKind(startedAtUtc, DateTimeKind.Utc);
         var localStartedAt = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
         var startDate = DateOnly.FromDateTime(localStartedAt);
+        var localTime = localStartedAt.TimeOfDay;
+        var cutoffTime = TimeSpan.TryParse(settings.CutoffTime, out var parsedCutoff)
+            ? parsedCutoff
+            : new TimeSpan(22, 0, 0);
 
-        // A sleep day begins at 21:00 and remains the same sleep day through 02:00.
-        // Starting during the after-midnight window therefore belongs to yesterday;
-        // all other setup times prepare the user for tonight's sleep day.
-        return localStartedAt.TimeOfDay <= CheckInEnd ? startDate.AddDays(-1) : startDate;
+        // Completing setup after the personal bedtime must not immediately create
+        // a missed night. The user can still actively check in late for the open
+        // sleep day, but inferred absences begin with the next bedtime instead.
+        var bedtimeHasPassedThisEvening = localTime >= CheckInStart
+            && cutoffTime != TimeSpan.Zero
+            && localTime > cutoffTime;
+
+        return bedtimeHasPassedThisEvening ? startDate.AddDays(1) : startDate;
     }
 
     public bool IsValidTimeZone(string timeZoneId)

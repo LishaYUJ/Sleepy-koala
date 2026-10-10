@@ -29,13 +29,15 @@ public class SleepCalendarServiceTests
     }
 
     [Theory]
-    [InlineData(0, 30, "2026-07-16")]
-    [InlineData(2, 0, "2026-07-16")]
+    [InlineData(0, 30, "2026-07-17")]
+    [InlineData(2, 0, "2026-07-17")]
     [InlineData(2, 1, "2026-07-17")]
     [InlineData(20, 59, "2026-07-17")]
     [InlineData(21, 0, "2026-07-17")]
-    [InlineData(23, 30, "2026-07-17")]
-    public void Tracking_StartsWithTheSleepDayAvailableAtSetup(
+    [InlineData(22, 0, "2026-07-17")]
+    [InlineData(22, 1, "2026-07-18")]
+    [InlineData(23, 30, "2026-07-18")]
+    public void Tracking_DoesNotInferAMissWhenSetupHappensAfterBedtime(
         int hour,
         int minute,
         string expectedStart)
@@ -46,6 +48,21 @@ public class SleepCalendarServiceTests
         var result = service.GetTrackingStartSleepDate(UtcSettings(), startedAt);
 
         Assert.Equal(expectedStart, result.ToString("yyyy-MM-dd"));
+    }
+
+    [Fact]
+    public void Tracking_UsesAStoredOnboardingDateWhenAvailable()
+    {
+        var settings = UtcSettings();
+        settings.TrackingStartSleepDate = "2026-07-20";
+        var service = new SleepCalendarService(
+            new FixedTimeProvider(new DateTimeOffset(2026, 7, 17, 1, 0, 0, TimeSpan.Zero)));
+
+        var result = service.GetTrackingStartSleepDate(
+            settings,
+            new DateTime(2026, 7, 17, 1, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal("2026-07-20", result.ToString("yyyy-MM-dd"));
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
