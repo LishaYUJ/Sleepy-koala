@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Moon, Trophy } from 'lucide-react';
 import landingPageBackground from '../assets/landingpage.png';
+import { KoalaLogo } from '../components/KoalaLogo';
 
 export const Landing: React.FC = () => (
   <main className="landing-page">
@@ -29,7 +30,7 @@ export const Landing: React.FC = () => (
     `}</style>
     <nav className="landing-nav" aria-label="Main navigation">
       <Link className="landing-brand brand-font" to="/">
-        <img className="landing-brand-icon" src="/icons/sleepy-koala-app-icon.png?v=2" alt="" aria-hidden="true" />
+        <KoalaLogo className="landing-brand-icon" />
         Sleepy Koala
       </Link>
       <Link className="landing-login" to="/login">Log in</Link>
