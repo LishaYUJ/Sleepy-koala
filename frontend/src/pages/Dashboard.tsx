@@ -62,8 +62,7 @@ export const Dashboard: React.FC = () => {
 
   // Sync state on load
   useEffect(() => {
-    const sleepDate = getCurrentSleepDateString();
-    loadSummary(sleepDate);
+    loadSummary();
     loadHistory();
     loadBadges();
   }, [loadSummary, loadHistory, loadBadges]);
@@ -72,7 +71,7 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-      loadSummary(getCurrentSleepDateString());
+      loadSummary();
     }, 30000);
     return () => clearInterval(interval);
   }, [loadSummary]);

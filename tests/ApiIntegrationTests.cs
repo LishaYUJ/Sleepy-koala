@@ -199,7 +199,7 @@ namespace SleepyKoala.Tests
             Assert.NotNull(settings);
             Assert.Equal(credentials.Nickname, settings!.Nickname);
             Assert.Equal("22:00", settings.CutoffTime);
-            Assert.Equal("UTC", settings.TimeZoneId);
+            Assert.DoesNotContain("timeZoneId", await settingsResponse.Content.ReadAsStringAsync());
         }
 
         [Fact]
@@ -235,8 +235,9 @@ namespace SleepyKoala.Tests
             var credentials = await RegisterUserAsync(client);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
 
-            var updateResponse = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var updateResponse = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = credentials.Nickname,
                 CutoffTime = "22:00",
                 AvatarDataUrl = avatar
@@ -267,8 +268,9 @@ namespace SleepyKoala.Tests
             var credentials = await RegisterUserAsync(client);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
 
-            var response = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var response = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = credentials.Nickname,
                 CutoffTime = "22:00",
                 AvatarDataUrl = "data:image/png;base64,bm90IGFuIGltYWdl"
@@ -283,8 +285,9 @@ namespace SleepyKoala.Tests
             var client = _factory.CreateClient();
 
             var getSettings = await client.GetAsync("/api/settings/me");
-            var putSettings = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var putSettings = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = "NoToken",
                 CutoffTime = "22:00"
             });
@@ -295,7 +298,7 @@ namespace SleepyKoala.Tests
                 LocalDate = "2026-07-16",
                 LocalTime = "21:30"
             });
-            var getCheckIns = await client.GetAsync("/api/CheckIns/me");
+            var getCheckIns = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
             var deleteAccount = await client.DeleteAsync("/api/account/me");
 
             Assert.Equal(HttpStatusCode.Unauthorized, getSettings.StatusCode);
@@ -337,29 +340,33 @@ namespace SleepyKoala.Tests
             var credentials = await RegisterUserAsync(client);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
 
-            var updateSettings = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var updateSettings = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = "Sleepy Tester",
                 CutoffTime = "21:45"
             });
             Assert.Equal(HttpStatusCode.OK, updateSettings.StatusCode);
 
-            var invalidSettings = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var invalidSettings = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = "Sleepy Tester",
                 CutoffTime = "02:00"
             });
             Assert.Equal(HttpStatusCode.BadRequest, invalidSettings.StatusCode);
 
-            var midnightSettings = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            var midnightSettings = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = "Sleepy Tester",
                 CutoffTime = "00:00"
             });
             Assert.Equal(HttpStatusCode.OK, midnightSettings.StatusCode);
 
-            updateSettings = await client.PutAsJsonAsync("/api/settings/me", new SettingsDto
+            updateSettings = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
             {
+                LocalDate = "2026-07-17", LocalTime = "10:00",
                 Nickname = "Sleepy Tester",
                 CutoffTime = "21:45"
             });
@@ -371,7 +378,7 @@ namespace SleepyKoala.Tests
             Assert.Equal("Sleepy Tester", settings!.Nickname);
             Assert.Equal("21:45", settings.CutoffTime);
 
-            var summaryBefore = await client.GetAsync("/api/me/summary?localDate=2026-07-16");
+            var summaryBefore = await client.GetAsync("/api/me/summary?localDate=2026-07-16&localTime=22:00");
             Assert.Equal(HttpStatusCode.OK, summaryBefore.StatusCode);
             var before = await summaryBefore.Content.ReadFromJsonAsync<DashboardSummaryDto>();
             Assert.NotNull(before);
@@ -400,13 +407,13 @@ namespace SleepyKoala.Tests
             });
             Assert.Equal(HttpStatusCode.BadRequest, duplicateCheckIn.StatusCode);
 
-            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var historyResponse = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
             var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
             Assert.Single(history!);
             Assert.Equal(checkIn.CheckInId, history![0].Id);
 
-            var summaryAfter = await client.GetAsync("/api/me/summary?localDate=2026-07-16");
+            var summaryAfter = await client.GetAsync("/api/me/summary?localDate=2026-07-16&localTime=22:00");
             Assert.Equal(HttpStatusCode.OK, summaryAfter.StatusCode);
             var after = await summaryAfter.Content.ReadFromJsonAsync<DashboardSummaryDto>();
             Assert.True(after!.TodayCheckedIn);
@@ -426,7 +433,14 @@ namespace SleepyKoala.Tests
             var credentials = await RegisterUserAsync(client);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
 
-            var sleepDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var user = await db.Users.Include(u => u.Settings).SingleAsync(u => u.Email == credentials.Email);
+                user.Settings!.TrackingStartSleepDate = "2026-07-16";
+                await db.SaveChangesAsync();
+            }
+            var sleepDate = "2026-07-17";
             var summaryResponse = await client.GetAsync($"/api/me/summary?localDate={sleepDate}&localTime=10:00");
 
             Assert.Equal(HttpStatusCode.OK, summaryResponse.StatusCode);
@@ -456,7 +470,7 @@ namespace SleepyKoala.Tests
                 await db.SaveChangesAsync();
             }
 
-            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var historyResponse = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
 
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
             var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
@@ -480,11 +494,11 @@ namespace SleepyKoala.Tests
                 var user = await db.Users.Include(u => u.Settings)
                     .SingleAsync(u => u.Email == credentials.Email);
                 user.CreatedAtUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc);
-                user.Settings!.TrackingStartSleepDate = null;
+                user.Settings!.TrackingStartSleepDate = "2026-06-01";
                 await db.SaveChangesAsync();
             }
 
-            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var historyResponse = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
             var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
 
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
@@ -508,7 +522,7 @@ namespace SleepyKoala.Tests
                 var user = await db.Users.Include(u => u.Settings)
                     .SingleAsync(u => u.Email == credentials.Email);
                 user.CreatedAtUtc = new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc);
-                user.Settings!.TrackingStartSleepDate = null;
+                user.Settings!.TrackingStartSleepDate = "2026-06-01";
                 db.CheckIns.Add(new SleepyKoala.Api.Models.CheckIn
                 {
                     UserId = user.Id,
@@ -519,7 +533,7 @@ namespace SleepyKoala.Tests
                 await db.SaveChangesAsync();
             }
 
-            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var historyResponse = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
             var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
 
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
@@ -553,7 +567,7 @@ namespace SleepyKoala.Tests
                 await db.SaveChangesAsync();
             }
 
-            var historyResponse = await client.GetAsync("/api/CheckIns/me");
+            var historyResponse = await client.GetAsync("/api/CheckIns/me?localDate=2026-07-17&localTime=10:00");
             var history = await historyResponse.Content.ReadFromJsonAsync<List<CheckInHistoryDto>>();
 
             Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
@@ -561,6 +575,71 @@ namespace SleepyKoala.Tests
             Assert.Equal("2026-07-17", recorded.LocalCheckInDate);
             Assert.Equal("late", recorded.Status);
             Assert.Equal(checkedInAtUtc, recorded.CheckedInAtUtc);
+        }
+
+        [Fact]
+        public async Task DeviceClock_DrivesDashboardAndHistoryAcrossMidnightAndWindowClose()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+            var setup = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
+            {
+                Nickname = credentials.Nickname, CutoffTime = "22:00", OnboardingCompleted = true,
+                LocalDate = "2026-10-30", LocalTime = "20:00"
+            });
+            setup.EnsureSuccessStatusCode();
+
+            var openHistory = await client.GetFromJsonAsync<List<CheckInHistoryDto>>(
+                "/api/checkins/me?localDate=2026-10-31&localTime=02:00");
+            Assert.Empty(openHistory!);
+            var openDashboard = await client.GetFromJsonAsync<DashboardSummaryDto>(
+                "/api/me/summary?localDate=2026-10-31&localTime=02:00");
+            Assert.Null(openDashboard!.TodayStatus);
+
+            var closedHistory = await client.GetFromJsonAsync<List<CheckInHistoryDto>>(
+                "/api/checkins/me?localDate=2026-10-31&localTime=02:01");
+            var missing = Assert.Single(closedHistory!);
+            Assert.Equal("2026-10-30", missing.LocalCheckInDate);
+            Assert.Equal("missing", missing.Status);
+            var closedDashboard = await client.GetFromJsonAsync<DashboardSummaryDto>(
+                "/api/me/summary?localDate=2026-10-31&localTime=02:01");
+            Assert.Equal("missing", closedDashboard!.TodayStatus);
+
+            // Moving the device date backward does not rewrite stored sleep dates.
+            var earlier = await client.GetFromJsonAsync<List<CheckInHistoryDto>>(
+                "/api/checkins/me?localDate=2026-10-30&localTime=23:00");
+            Assert.Empty(earlier!);
+        }
+
+        [Fact]
+        public async Task DeviceClock_RequiredAndValidatedForReads()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+            foreach (var path in new[] { "/api/me/summary", "/api/checkins/me" })
+            {
+                Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync(path)).StatusCode);
+                Assert.Equal(HttpStatusCode.BadRequest,
+                    (await client.GetAsync(path + "?localDate=2026-02-30&localTime=22:00")).StatusCode);
+                Assert.Equal(HttpStatusCode.BadRequest,
+                    (await client.GetAsync(path + "?localDate=2026-07-17&localTime=25:00")).StatusCode);
+            }
+        }
+
+        [Fact]
+        public async Task LegacyAccount_WithoutLocalStartDoesNotInventUtcBasedMissingHistory()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+            var history = await client.GetFromJsonAsync<List<CheckInHistoryDto>>(
+                "/api/checkins/me?localDate=2026-10-31&localTime=10:00");
+            Assert.Empty(history!);
+            var dashboard = await client.GetFromJsonAsync<DashboardSummaryDto>(
+                "/api/me/summary?localDate=2026-10-31&localTime=10:00");
+            Assert.Null(dashboard!.TodayStatus);
         }
 
         private static async Task<TestCredentials> RegisterUserAsync(HttpClient client)

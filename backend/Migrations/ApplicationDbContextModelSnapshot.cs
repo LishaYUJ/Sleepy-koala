@@ -178,11 +178,6 @@ namespace SleepyKoala.Api.Migrations
                     b.Property<bool>("OnboardingCompleted")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("TrackingStartSleepDate")
                         .HasMaxLength(10)
                         .HasColumnType("TEXT");

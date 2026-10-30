@@ -85,7 +85,6 @@ export interface UserSettingsDto {
   nickname: string;
   cutoffTime: string;
   onboardingCompleted: boolean;
-  timeZoneId: string;
   avatarDataUrl?: string | null;
 }
 
@@ -115,7 +114,7 @@ interface AppState {
   register: (email: string, password: string, nickname: string, registrationAttemptId: string) => Promise<void>;
   logout: () => void;
   deleteAccount: () => Promise<void>;
-  loadSummary: (localDateString?: string) => Promise<void>;
+  loadSummary: () => Promise<void>;
   performCheckIn: () => Promise<any>;
   loadHistory: () => Promise<void>;
   loadLeaderboard: () => Promise<void>;
@@ -137,6 +136,14 @@ export function getLocalTimeString(date: Date = new Date()): string {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
+}
+
+export function getDeviceLocalClock(date: Date = new Date()) {
+  return { localDate: getLocalDateString(date), localTime: getLocalTimeString(date) };
+}
+
+function deviceClockQuery() {
+  return new URLSearchParams(getDeviceLocalClock()).toString();
 }
 
 export function getCurrentSleepDateString(date: Date = new Date()): string {
@@ -210,8 +217,7 @@ export const useStore = create<AppState>((set, get) => ({
         authErrorKind: null,
       });
 
-      const sleepDate = getCurrentSleepDateString();
-      await get().loadSummary(sleepDate);
+      await get().loadSummary();
     } catch (err: any) {
       const wakeTimedOut = err instanceof ServerWakeTimeoutError;
       const networkFailed = err instanceof NetworkApiError;
@@ -317,8 +323,7 @@ export const useStore = create<AppState>((set, get) => ({
         authErrorKind: null,
       });
 
-      const sleepDate = getCurrentSleepDateString();
-      await get().loadSummary(sleepDate);
+      await get().loadSummary();
     } catch (err: any) {
       const wakeTimedOut = err instanceof ServerWakeTimeoutError;
       const unconfirmed = err instanceof RegistrationUnconfirmedError;
@@ -390,13 +395,13 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  loadSummary: async (_localDateString) => {
+  loadSummary: async () => {
     const { token } = get();
     if (!token) return;
     
     set({ isLoading: true, error: null });
     try {
-      const response = await api.get<UserSummary>('/api/me/summary', token);
+      const response = await api.get<UserSummary>(`/api/me/summary?${deviceClockQuery()}`, token);
       set({ summary: response, isLoading: false });
     } catch (err: any) {
       set({ isLoading: false, error: err.body?.message || err.message });
@@ -409,8 +414,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const localDate = getLocalDateString();
-      const localTime = getLocalTimeString();
+      const { localDate, localTime } = getDeviceLocalClock();
       const response: any = await api.post(
         '/api/checkins',
         { localDate, localTime },
@@ -420,7 +424,7 @@ export const useStore = create<AppState>((set, get) => ({
       
       // Keep both dashboard and history views in sync with the completed check-in.
       await Promise.all([
-        get().loadSummary(response.localCheckInDate || getCurrentSleepDateString()),
+        get().loadSummary(),
         get().loadHistory(),
       ]);
       return response;
@@ -436,7 +440,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const response = await api.get<CheckInHistory[]>('/api/checkins/me', token);
+      const response = await api.get<CheckInHistory[]>(`/api/checkins/me?${deviceClockQuery()}`, token);
       set({ history: response, isLoading: false });
     } catch (err: any) {
       set({ isLoading: false, error: err.body?.message || err.message });
@@ -473,7 +477,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const response = await api.put<UserSettingsDto>('/api/settings/me', dto, token);
+      const response = await api.put<UserSettingsDto>('/api/settings/me', { ...dto, ...getDeviceLocalClock() }, token);
       
       // Store nickname in localStorage
       localStorage.setItem('nickname', response.nickname);

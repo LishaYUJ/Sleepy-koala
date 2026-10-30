@@ -28,13 +28,13 @@ This preserves a consistent user outcome even when the client cannot know whethe
 
 ### A domain model for sleep days, not calendar days
 
-Bedtime activity crosses midnight, so an ordinary calendar-date model produces misleading history. Sleepy Koala assigns activity between midnight and 02:00 to the previous evening's sleep date, then evaluates it against the user's local bedtime and timezone.
+Bedtime activity crosses midnight, so an ordinary calendar-date model produces misleading history. Sleepy Koala assigns activity between midnight and 02:00 to the previous evening's sleep date, then evaluates it against the user's bedtime goal using the device's local date and time. Check-in, dashboard, and history requests all supply the current device-local clock; no timezone is configured or stored.
 
 The model also distinguishes real records from inferred absence:
 
 - real on-time and late check-ins remain durable history;
 - newly registered users do not begin with an unexplained missed night;
-- legacy accounts derive a fair tracking start when older data lacks one;
+- legacy accounts without a local tracking start use their earliest real check-in, or begin tracking when next accessed; UTC registration time is not used to invent earlier missed nights;
 - missing nights are inferred for at most seven consecutive days, then pause until the next real check-in.
 
 These rules are implemented in a dedicated calendar service and covered by boundary-focused tests rather than being spread through UI components.
@@ -55,7 +55,7 @@ These rules are implemented in a dedicated calendar service and covered by bound
 - Weekly history explains the state shown by the koala instead of presenting an unexplained score.
 - Streaks and milestone badges reward consistency.
 - Responsive desktop, mobile, and installable PWA layouts keep the bedtime sanctuary as the main experience.
-- Profile settings include nickname, avatar, timezone, bedtime goal, and account deletion.
+- Profile settings include nickname, avatar, bedtime goal, and account deletion.
 
 ## Architecture
 
@@ -87,8 +87,8 @@ The frontend and backend deploy independently. Vercel receives the API base URL 
 
 The current test suite contains:
 
-- **74 frontend tests** covering state transitions, authentication recovery, component behaviour, energy calculations, and history presentation;
-- **47 backend tests** covering authentication, authorization, idempotency, CORS, API integration, check-in rules, and sleep-day boundaries.
+- **76 frontend tests** covering state transitions, authentication recovery, component behaviour, energy calculations, and history presentation;
+- **56 backend tests** covering authentication, authorization, idempotency, CORS, API integration, check-in rules, and sleep-day boundaries.
 
 GitHub Actions builds and tests the frontend and backend on every pull request and push to `main`.
 

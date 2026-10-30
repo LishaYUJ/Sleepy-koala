@@ -14,7 +14,6 @@ namespace SleepyKoala.Api.Models
 
         public string CutoffTime { get; set; } = "22:00"; // default 10 PM
         public bool OnboardingCompleted { get; set; }
-        public string TimeZoneId { get; set; } = "UTC";
         public string? TrackingStartSleepDate { get; set; }
     }
 }

@@ -42,7 +42,6 @@ namespace SleepyKoala.Api.Data
             modelBuilder.Entity<UserSettings>(settings =>
             {
                 settings.Property(s => s.CutoffTime).HasMaxLength(5);
-                settings.Property(s => s.TimeZoneId).HasMaxLength(100);
                 settings.Property(s => s.TrackingStartSleepDate).HasMaxLength(10);
             });
 

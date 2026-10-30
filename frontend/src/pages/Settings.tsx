@@ -12,7 +12,6 @@ export const Settings: React.FC = () => {
   const [localNickname, setLocalNickname] = useState(nickname || '');
   const [profileAvatar, setProfileAvatar] = useState(avatarUrl || userAvatar);
   const [cutoffTime, setCutoffTime] = useState('22:00');
-  const [timeZoneId, setTimeZoneId] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Pacific/Auckland');
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const [successLocal, setSuccessLocal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,7 +84,6 @@ export const Settings: React.FC = () => {
           setLocalNickname(response.nickname);
           setProfileAvatar(response.avatarDataUrl || userAvatar);
           setCutoffTime(response.cutoffTime);
-          setTimeZoneId(response.timeZoneId || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Pacific/Auckland');
         }
       } catch (err: any) {
         if (isMounted) {
@@ -131,7 +129,6 @@ export const Settings: React.FC = () => {
         nickname: localNickname.trim(),
         cutoffTime: cutoffTime,
         onboardingCompleted: true,
-        timeZoneId: timeZoneId,
         avatarDataUrl: profileAvatar === userAvatar ? '' : profileAvatar
       });
       

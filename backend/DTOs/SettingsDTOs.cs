@@ -12,10 +12,19 @@ namespace SleepyKoala.Api.DTOs
         
         public bool OnboardingCompleted { get; set; }
 
-        [Required, StringLength(100)]
-        public string TimeZoneId { get; set; } = "UTC";
-
         [StringLength(700000)]
         public string? AvatarDataUrl { get; set; }
     }
+
+    public class UpdateSettingsRequest : SettingsDto
+    {
+        // Supplied by the device when settings are saved; never persisted as a timezone.
+        [Required]
+        public string LocalDate { get; set; } = string.Empty;
+
+        [Required]
+        public string LocalTime { get; set; } = string.Empty;
+
+    }
+
 }

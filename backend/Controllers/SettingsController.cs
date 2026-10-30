@@ -23,16 +23,13 @@ namespace SleepyKoala.Api.Controllers
 
         private readonly ApplicationDbContext _context;
         private readonly ISleepCalendarService _sleepCalendar;
-        private readonly TimeProvider _timeProvider;
 
         public SettingsController(
             ApplicationDbContext context,
-            ISleepCalendarService sleepCalendar,
-            TimeProvider timeProvider)
+            ISleepCalendarService sleepCalendar)
         {
             _context = context;
             _sleepCalendar = sleepCalendar;
-            _timeProvider = timeProvider;
         }
 
         [HttpGet]
@@ -52,13 +49,12 @@ namespace SleepyKoala.Api.Controllers
                 Nickname = user.Nickname,
                 CutoffTime = user.Settings.CutoffTime,
                 OnboardingCompleted = user.Settings.OnboardingCompleted,
-                TimeZoneId = user.Settings.TimeZoneId,
                 AvatarDataUrl = user.AvatarDataUrl
             });
         }
 
         [HttpPut]
-        public async Task<IActionResult> UpdateSettings(SettingsDto dto)
+        public async Task<IActionResult> UpdateSettings(UpdateSettingsRequest dto)
         {
             var userId = User.GetUserId();
             if (userId == null) return Unauthorized();
@@ -72,9 +68,11 @@ namespace SleepyKoala.Api.Controllers
                 return BadRequest(new { error = "InvalidCutoffTime", message = "Bedtime (CutoffTime) must be between 21:00 and 00:00 for the MVP." });
             }
 
-            if (!_sleepCalendar.IsValidTimeZone(dto.TimeZoneId))
+            SleepCalendarContext calendar;
+            try { calendar = _sleepCalendar.GetContext(dto.LocalDate, dto.LocalTime); }
+            catch (ArgumentException ex)
             {
-                return BadRequest(new { error = "InvalidTimeZone", message = "TimeZoneId must be a valid IANA time zone." });
+                return BadRequest(new { error = "InvalidLocalTime", message = ex.Message });
             }
 
 
@@ -94,12 +92,11 @@ namespace SleepyKoala.Api.Controllers
 
             user.Nickname = dto.Nickname.Trim();
             user.Settings.CutoffTime = dto.CutoffTime;
-            user.Settings.TimeZoneId = dto.TimeZoneId;
             user.Settings.OnboardingCompleted = dto.OnboardingCompleted;
-            if (completesOnboarding)
+            if (completesOnboarding || user.Settings.TrackingStartSleepDate == null)
             {
                 user.Settings.TrackingStartSleepDate = _sleepCalendar
-                    .GetTrackingStartSleepDate(user.Settings, _timeProvider.GetUtcNow().UtcDateTime)
+                    .GetInitialTrackingStartSleepDate(user.Settings, calendar)
                     .ToString("yyyy-MM-dd");
             }
             if (dto.AvatarDataUrl != null)
@@ -116,7 +113,6 @@ namespace SleepyKoala.Api.Controllers
                 Nickname = user.Nickname,
                 CutoffTime = user.Settings.CutoffTime,
                 OnboardingCompleted = user.Settings.OnboardingCompleted,
-                TimeZoneId = user.Settings.TimeZoneId,
                 AvatarDataUrl = user.AvatarDataUrl
             });
         }

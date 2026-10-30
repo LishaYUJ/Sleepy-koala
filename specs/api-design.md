@@ -123,7 +123,8 @@ Request body:
 
 ```json
 {
-  "timezone": "Pacific/Auckland"
+  "localDate": "2026-07-03",
+  "localTime": "21:30"
 }
 ```
 
@@ -144,9 +145,9 @@ Response:
 
 Business rules:
 
-- current timestamp is stored in UTC
-- local date is calculated based on timezone
-- user cannot check in more than once on the same local date
+- server receipt timestamp is stored in UTC for audit purposes
+- device-local date and time determine the sleep date; midnight through 02:00 belongs to the preceding evening
+- user cannot check in more than once on the same sleep date
 - check-in is `onTime` if local time is before or equal to cutoff time
 - check-in is `late` if local time is after cutoff time but before the check-in window ends at 2:00 AM
 - check-ins completely missed are evaluated automatically as `missing` by the dashboard logic
@@ -214,7 +215,6 @@ Response:
 {
   "nickname": "SleepyCat",
   "cutoffTime": "00:00",
-  "timeZoneId": "Pacific/Auckland",
   "onboardingCompleted": true,
   "avatarDataUrl": ""
 }
@@ -234,7 +234,8 @@ Request body:
 {
   "nickname": "KoalaMoon",
   "cutoffTime": "23:45",
-  "timeZoneId": "Pacific/Auckland",
+  "localDate": "2026-07-03",
+  "localTime": "20:00",
   "onboardingCompleted": true,
   "avatarDataUrl": ""
 }
@@ -246,7 +247,8 @@ Response:
 {
   "nickname": "KoalaMoon",
   "cutoffTime": "23:45",
-  "timeZoneId": "Pacific/Auckland",
+  "localDate": "2026-07-03",
+  "localTime": "20:00",
   "onboardingCompleted": true,
   "avatarDataUrl": ""
 }
@@ -256,7 +258,7 @@ Validation:
 
 - nickname must not be empty
 - cutoff time must be valid
-- timezone must be valid
+- localDate and localTime must be valid device-local date/time strings
 
 ---
 
@@ -347,3 +349,14 @@ Common errors:
 - InvalidCutoffTime
 - InvalidTimezone
 - NotFound
+
+
+## Device-local clock contract
+
+`GET /api/me/summary` and `GET /api/checkins/me` require `localDate=yyyy-MM-dd&localTime=HH:mm` query parameters. Read these values from one device clock snapshot per request, including refreshes. Settings updates require the same fields in the body to establish the local tracking start; settings responses do not return them. No timezone ID is stored or used. UTC timestamps remain server receipt/audit timestamps, not the source of local day decisions.
+
+The app trusts the device clock. Travelling affects future evaluations using the new local date and time; existing sleep-date records are not reinterpreted. Dates skipped while travelling follow the usual missing-night rules. This model does not prevent changing the device clock manually.
+
+For accounts lacking a saved tracking start, the earliest real sleep-date record is used; if none exists, tracking starts from the next observed local setup/access date under the normal bedtime rules. The original local registration date cannot be recovered from UTC alone, so earlier absences are not inferred.
+
+Deployment: release the frontend and API together because dashboard/history now require the device clock. Apply the `RemoveSavedTimeZone` EF migration to remove the obsolete column; it preserves check-ins, streaks, and saved tracking dates. This source change does not itself apply a production migration.

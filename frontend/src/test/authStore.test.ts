@@ -24,6 +24,7 @@ const summaryResponse = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -144,6 +145,8 @@ describe('idempotent registration recovery', () => {
 
 describe('check-in history synchronization', () => {
   it('reloads both the summary and history after a successful check-in', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 31, 0, 30));
     const historyEntry = {
       id: 'check-in-id',
       localCheckInDate: '2026-10-09',
@@ -159,15 +162,37 @@ describe('check-in history synchronization', () => {
       status: historyEntry.status,
     });
     const get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
-      if (url === '/api/me/summary') return summaryResponse as any;
-      if (url === '/api/checkins/me') return [historyEntry] as any;
+      if (url.startsWith('/api/me/summary?')) return summaryResponse as any;
+      if (url.startsWith('/api/checkins/me?')) return [historyEntry] as any;
       throw new Error(`Unexpected API request: ${url}`);
     });
 
     await useStore.getState().performCheckIn();
 
-    expect(get).toHaveBeenCalledWith('/api/me/summary', 'token');
-    expect(get).toHaveBeenCalledWith('/api/checkins/me', 'token');
+    expect(get).toHaveBeenCalledWith('/api/me/summary?localDate=2026-10-31&localTime=00%3A30', 'token');
+    expect(get).toHaveBeenCalledWith('/api/checkins/me?localDate=2026-10-31&localTime=00%3A30', 'token');
+    expect(api.post).toHaveBeenCalledWith('/api/checkins', { localDate: '2026-10-31', localTime: '00:30' }, 'token');
     expect(useStore.getState().history).toEqual([historyEntry]);
+  });
+});
+
+
+describe('device clock settings', () => {
+  it('sends the current local clock on each save without persisting a timezone', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 31, 20, 15));
+    useStore.setState({ token: 'token' });
+    const dto = { nickname: 'Koala', cutoffTime: '22:00', onboardingCompleted: true };
+    const put = vi.spyOn(api, 'put').mockResolvedValue(dto);
+    vi.spyOn(api, 'get').mockResolvedValue(summaryResponse);
+    await useStore.getState().updateSettings(dto);
+    expect(put).toHaveBeenLastCalledWith('/api/settings/me', {
+      ...dto, localDate: '2026-10-31', localTime: '20:15',
+    }, 'token');
+    vi.setSystemTime(new Date(2026, 10, 1, 0, 30));
+    await useStore.getState().updateSettings(dto);
+    expect(put).toHaveBeenLastCalledWith('/api/settings/me', {
+      ...dto, localDate: '2026-11-01', localTime: '00:30',
+    }, 'token');
   });
 });

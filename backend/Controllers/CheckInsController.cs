@@ -55,7 +55,7 @@ namespace SleepyKoala.Api.Controllers
         }
 
         [HttpGet("me")]
-        public async Task<IActionResult> GetMyCheckIns()
+        public async Task<IActionResult> GetMyCheckIns([FromQuery] string localDate, [FromQuery] string localTime)
         {
             var userId = User.GetUserId();
             if (userId == null) return Unauthorized();
@@ -67,7 +67,21 @@ namespace SleepyKoala.Api.Controllers
 
             if (user == null || user.Settings == null) return NotFound();
 
-            var calendar = _sleepCalendar.GetContext(user.Settings);
+            SleepCalendarContext calendar;
+            try { calendar = _sleepCalendar.GetContext(localDate, localTime); }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = "InvalidLocalTime", message = ex.Message });
+            }
+
+            if (user.Settings.TrackingStartSleepDate == null)
+            {
+                var firstRecorded = await _context.CheckIns.Where(c => c.UserId == user.Id)
+                    .OrderBy(c => c.LocalCheckInDate).Select(c => c.LocalCheckInDate).FirstOrDefaultAsync();
+                user.Settings.TrackingStartSleepDate = firstRecorded ?? _sleepCalendar
+                    .GetTrackingStartSleepDate(user.Settings, calendar).ToString("yyyy-MM-dd");
+                await _context.SaveChangesAsync();
+            }
             var checkInsByDate = user.CheckIns
                 .Where(c => DateOnly.TryParseExact(c.LocalCheckInDate, "yyyy-MM-dd", out _))
                 .ToDictionary(c => c.LocalCheckInDate);
@@ -77,23 +91,7 @@ namespace SleepyKoala.Api.Controllers
                 .OrderBy(date => date)
                 .FirstOrDefault();
 
-            var fairRegistrationStart = _sleepCalendar
-                .GetInitialTrackingStartSleepDate(user.Settings, user.CreatedAtUtc);
-
-            DateOnly trackingStart;
-            if (DateOnly.TryParseExact(user.Settings.TrackingStartSleepDate, "yyyy-MM-dd", out var storedStart))
-            {
-                // Older onboarding logic could start tracking the previous sleep
-                // day for users who registered after midnight. Never infer a miss
-                // before the fair start calculated from their registration time.
-                trackingStart = storedStart > fairRegistrationStart
-                    ? storedStart
-                    : fairRegistrationStart;
-            }
-            else
-            {
-                trackingStart = fairRegistrationStart;
-            }
+            var trackingStart = _sleepCalendar.GetTrackingStartSleepDate(user.Settings, calendar);
 
             // Never hide a real check-in because an older onboarding flow stored
             // a tracking start date after the sleep day that the check-in belongs to.

@@ -5,7 +5,7 @@ namespace SleepyKoala.Tests;
 
 public class SleepCalendarServiceTests
 {
-    private static UserSettings UtcSettings() => new() { TimeZoneId = "UTC" };
+    private static UserSettings Settings() => new();
 
     [Theory]
     [InlineData(1, 59, "2026-07-16", "2026-07-15")]
@@ -19,10 +19,9 @@ public class SleepCalendarServiceTests
         string expectedCurrent,
         string expectedLastClosed)
     {
-        var now = new DateTimeOffset(2026, 7, 17, hour, minute, 0, TimeSpan.Zero);
-        var service = new SleepCalendarService(new FixedTimeProvider(now));
+        var service = new SleepCalendarService();
 
-        var context = service.GetContext(UtcSettings());
+        var context = service.GetContext("2026-07-17", $"{hour:D2}:{minute:D2}");
 
         Assert.Equal(expectedCurrent, context.CurrentSleepDate.ToString("yyyy-MM-dd"));
         Assert.Equal(expectedLastClosed, context.LastClosedSleepDate.ToString("yyyy-MM-dd"));
@@ -42,10 +41,9 @@ public class SleepCalendarServiceTests
         int minute,
         string expectedStart)
     {
-        var startedAt = new DateTime(2026, 7, 17, hour, minute, 0, DateTimeKind.Utc);
-        var service = new SleepCalendarService(new FixedTimeProvider(new DateTimeOffset(startedAt)));
+        var service = new SleepCalendarService();
 
-        var result = service.GetTrackingStartSleepDate(UtcSettings(), startedAt);
+        var result = service.GetTrackingStartSleepDate(Settings(), service.GetContext("2026-07-17", $"{hour:D2}:{minute:D2}"));
 
         Assert.Equal(expectedStart, result.ToString("yyyy-MM-dd"));
     }
@@ -53,20 +51,25 @@ public class SleepCalendarServiceTests
     [Fact]
     public void Tracking_UsesAStoredOnboardingDateWhenAvailable()
     {
-        var settings = UtcSettings();
+        var settings = Settings();
         settings.TrackingStartSleepDate = "2026-07-20";
-        var service = new SleepCalendarService(
-            new FixedTimeProvider(new DateTimeOffset(2026, 7, 17, 1, 0, 0, TimeSpan.Zero)));
+        var service = new SleepCalendarService();
 
         var result = service.GetTrackingStartSleepDate(
             settings,
-            new DateTime(2026, 7, 17, 1, 0, 0, DateTimeKind.Utc));
+            service.GetContext("2026-07-17", "01:00"));
 
         Assert.Equal("2026-07-20", result.ToString("yyyy-MM-dd"));
     }
 
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    [Theory]
+    [InlineData("2026-02-30", "22:00")]
+    [InlineData("2026-07-17", "25:00")]
+    [InlineData("2026-07-17", "1.00:00:00")]
+    [InlineData("", "22:00")]
+    [InlineData("2026-07-17", "")]
+    public void Context_RejectsInvalidDeviceClock(string date, string time)
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        Assert.Throws<ArgumentException>(() => new SleepCalendarService().GetContext(date, time));
     }
 }

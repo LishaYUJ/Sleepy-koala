@@ -28,7 +28,7 @@ namespace SleepyKoala.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetSummary()
+        public async Task<IActionResult> GetSummary([FromQuery] string localDate, [FromQuery] string localTime)
         {
             var userId = User.GetUserId();
             if (userId == null) return Unauthorized();
@@ -41,7 +41,21 @@ namespace SleepyKoala.Api.Controllers
 
             if (user == null || user.Settings == null) return NotFound();
 
-            var calendar = _sleepCalendar.GetContext(user.Settings);
+            SleepCalendarContext calendar;
+            try { calendar = _sleepCalendar.GetContext(localDate, localTime); }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = "InvalidLocalTime", message = ex.Message });
+            }
+
+            if (user.Settings.TrackingStartSleepDate == null)
+            {
+                var firstRecorded = await _context.CheckIns.Where(c => c.UserId == user.Id)
+                    .OrderBy(c => c.LocalCheckInDate).Select(c => c.LocalCheckInDate).FirstOrDefaultAsync();
+                user.Settings.TrackingStartSleepDate = firstRecorded ?? _sleepCalendar
+                    .GetTrackingStartSleepDate(user.Settings, calendar).ToString("yyyy-MM-dd");
+                await _context.SaveChangesAsync();
+            }
             var localDateStr = calendar.CurrentSleepDate.ToString("yyyy-MM-dd");
 
             var todayCheckIn = await _context.CheckIns
@@ -77,6 +91,7 @@ namespace SleepyKoala.Api.Controllers
                     .ToDictionaryAsync(c => c.LocalCheckInDate, c => c.Status);
 
                 if (todayCheckIn == null &&
+                    calendar.CurrentSleepDate >= _sleepCalendar.GetTrackingStartSleepDate(user.Settings, calendar) &&
                     calendar.CurrentSleepDate <= calendar.LastClosedSleepDate)
                 {
                     inferredTodayStatus = "missing";
@@ -84,7 +99,7 @@ namespace SleepyKoala.Api.Controllers
                 }
 
                 var dateToCheck = todayDate.AddDays(-1);
-                var registerDate = _sleepCalendar.GetTrackingStartSleepDate(user.Settings, user.CreatedAtUtc);
+                var registerDate = _sleepCalendar.GetTrackingStartSleepDate(user.Settings, calendar);
 
                 for (int i = 0; i < 30; i++)
                 {
