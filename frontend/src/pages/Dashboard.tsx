@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore, getCurrentSleepDateString, getLocalDateString } from '../stores/useStore';
 import { Sparkles, Moon, CheckCircle, X, Award, Flame, AlertCircle, Clock3, ChevronRight, Heart } from 'lucide-react';
@@ -37,6 +37,8 @@ export const Dashboard: React.FC = () => {
   } | null>(null);
 
   const [slideVal, setSlideVal] = useState(0);
+  const sliderSubmitting = useRef(false);
+  const [holdCompletedSlide, setHoldCompletedSlide] = useState(false);
   const [isKoalaStatusOpen, setIsKoalaStatusOpen] = useState(false);
 
   useEffect(() => {
@@ -386,12 +388,37 @@ export const Dashboard: React.FC = () => {
         // Automatically slide to progress view upon successful checkin
         setTimeout(() => {
            setCurrentView('progress');
+           setHoldCompletedSlide(false);
         }, 500);
+        return true;
       }
     } catch (err) {
       // Handled in store
     }
+    return false;
   };
+
+  const finishCheckInSlide = async (value: number) => {
+    if (sliderSubmitting.current || showRecordedCheckIn || isLoading) return;
+    if (value <= 90) {
+      setSlideVal(0);
+      return;
+    }
+
+    sliderSubmitting.current = true;
+    setSlideVal(100);
+    setHoldCompletedSlide(true);
+    try {
+      if (!await handleCheckIn()) {
+        setSlideVal(0);
+        setHoldCompletedSlide(false);
+      }
+    } finally {
+      sliderSubmitting.current = false;
+    }
+  };
+
+  const displayedSlideVal = showRecordedCheckIn ? 100 : slideVal;
 
   const closeCheckInModal = () => {
     setJustCheckedInMsg(null);
@@ -1903,27 +1930,37 @@ export const Dashboard: React.FC = () => {
               {renderKoalaStatus('desktop')}
 
               {/* Desktop Slider Check-In Wrapper */}
-              {showRecordedCheckIn ? (
+              {showRecordedCheckIn && !holdCompletedSlide ? (
                 renderPostCheckInMessage()
-              ) : canCheckInNow ? (
+              ) : holdCompletedSlide || canCheckInNow ? (
                 <div className="slider-wrapper" style={{ position: 'relative', zIndex: 10, width: '380px', maxWidth: '90vw', height: '72px', marginTop: '0', background: 'rgba(30, 27, 75, 0.6)', border: '1.5px solid rgba(167, 139, 250, 0.3)', borderRadius: '99px', overflow: 'hidden' }}>
-                  <div className="slider-text" style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: '#b19df7', fontSize: '1.15rem', gap: '12px', opacity: 1 - (slideVal / 100), fontFamily: 'var(--font-body)', fontWeight: 500 }}>
-                     <span style={{ letterSpacing: '4px', opacity: 0.5 }}>········</span>
-                     {dashboardCopy.actionText}
+                  <div
+                    className="slider-trail"
+                    aria-hidden="true"
+                    style={{ position: 'absolute', left: '36px', top: '50%', width: `calc(24px + ${displayedSlideVal}% - ${displayedSlideVal * 0.96}px)`, borderTop: '2px dashed rgba(177, 157, 247, 0.65)', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <div className="slider-text" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: '50px', pointerEvents: 'none', color: '#b19df7', fontSize: '1.15rem', opacity: 1 - (displayedSlideVal / 100), fontFamily: 'var(--font-body)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                     Slide to check in
                   </div>
-                  
-                  <div className="slider-thumb" style={{ position: 'absolute', top: '5px', left: `calc(6px + ${slideVal}% - ${slideVal * 0.72}px)`, width: '60px', height: '60px', background: '#ffe4a0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(255, 228, 160, 0.4)', pointerEvents: 'none', zIndex: 5 }}>
-                     <Moon size={28} color="#9061f9" />
+
+                  <div className="slider-thumb" style={{ position: 'absolute', top: '5px', left: `calc(6px + ${displayedSlideVal}% - ${displayedSlideVal * 0.72}px)`, width: '60px', height: '60px', background: '#ffe4a0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(255, 228, 160, 0.4)', pointerEvents: 'none', zIndex: 5 }}>
+                     {showRecordedCheckIn ? <CheckCircle size={28} color="#9061f9" /> : <Moon size={28} color="#9061f9" />}
                   </div>
 
                   <input 
                     type="range"
                     min="0" max="100"
-                    value={slideVal}
+                    aria-label={showRecordedCheckIn ? 'Checked in' : 'Slide to check in'}
+                    value={displayedSlideVal}
                     onChange={(e) => setSlideVal(Number(e.target.value))}
-                    onMouseUp={() => { if (slideVal > 90 && !isLoading) { handleCheckIn(); } setSlideVal(0); }}
-                    onTouchEnd={() => { if (slideVal > 90 && !isLoading) { handleCheckIn(); } setSlideVal(0); }}
-                    disabled={isLoading}
+                    onPointerUp={(e) => { void finishCheckInSlide(Number(e.currentTarget.value)); }}
+                    onPointerCancel={() => { if (!sliderSubmitting.current) setSlideVal(0); }}
+                    onKeyUp={(e) => {
+                      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+                        void finishCheckInSlide(Number(e.currentTarget.value));
+                      }
+                    }}
+                    disabled={isLoading || holdCompletedSlide || showRecordedCheckIn}
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, zIndex: 10, cursor: 'grab' }}
                   />
                 </div>
