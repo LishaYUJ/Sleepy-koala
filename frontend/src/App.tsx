@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { History } from './pages/History';
 import { Landing } from './pages/Landing';
 import { Onboarding } from './pages/Onboarding';
+import { syncReminderTimeZone } from './services/push';
 
 const StarrySky: React.FC = () => {
   return (
@@ -171,6 +172,16 @@ const OnboardingRoute: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const token = useStore(state => state.token);
+  useEffect(() => {
+    if (!token) return;
+    const sync = () => {
+      if (document.visibilityState === 'visible') void syncReminderTimeZone(token).catch(() => {});
+    };
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, [token]);
   return (
     <BrowserRouter>
       {/* Dynamic Starry Sky Background Layer */}

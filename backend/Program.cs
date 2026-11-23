@@ -70,6 +70,14 @@ builder.Services.AddScoped<ICheckInService, CheckInService>();
 builder.Services.AddScoped<CheckInSummaryService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ISleepCalendarService, SleepCalendarService>();
+var webPushSettings = builder.Configuration.GetSection("WebPush").Get<WebPushSettings>() ?? new();
+webPushSettings.Validate();
+builder.Services.AddSingleton(webPushSettings);
+builder.Services.AddHttpClient<IWebPushSender, WebPushSender>(client => client.Timeout = TimeSpan.FromSeconds(20))
+    .RemoveAllLoggers()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddScoped<ReminderDispatcher>();
+if (webPushSettings.Enabled && webPushSettings.RunWorker) builder.Services.AddHostedService<ReminderWorker>();
 
 // 4. Controllers & Features
 builder.Services.AddControllers();

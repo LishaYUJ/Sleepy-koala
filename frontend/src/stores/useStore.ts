@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { stopPushOnLogout } from '../services/push';
 import {
   api,
   CustomApiError,
@@ -357,6 +358,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   logout: () => {
+    const sessionToken = get().token;
+    if (sessionToken) void stopPushOnLogout(sessionToken).catch(() => {});
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('email');

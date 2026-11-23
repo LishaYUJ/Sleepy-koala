@@ -6,12 +6,14 @@ import { api } from '../services/api';
 import { LogOut, Save, Check, Camera, Trash2 } from 'lucide-react';
 import userAvatar from '../assets/user_avatar.jpg';
 import { TimeGoalPicker } from '../components/TimeGoalPicker';
+import { SleepReminders } from '../components/SleepReminders';
 
 export const Settings: React.FC = () => {
   const { nickname, avatarUrl, logout, deleteAccount, token } = useStore();
   const [localNickname, setLocalNickname] = useState(nickname || '');
   const [profileAvatar, setProfileAvatar] = useState(avatarUrl || userAvatar);
   const [cutoffTime, setCutoffTime] = useState('22:00');
+  const [savedCutoffTime, setSavedCutoffTime] = useState<string | null>(null);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const [successLocal, setSuccessLocal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,6 +86,7 @@ export const Settings: React.FC = () => {
           setLocalNickname(response.nickname);
           setProfileAvatar(response.avatarDataUrl || userAvatar);
           setCutoffTime(response.cutoffTime);
+          setSavedCutoffTime(response.cutoffTime);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -132,6 +135,7 @@ export const Settings: React.FC = () => {
         avatarDataUrl: profileAvatar === userAvatar ? '' : profileAvatar
       });
       
+      setSavedCutoffTime(cutoffTime);
       setSuccessLocal(true);
       setTimeout(() => setSuccessLocal(false), 3000);
     } catch (err: any) {
@@ -330,6 +334,7 @@ export const Settings: React.FC = () => {
 
       <div className="settings-grid">
         {/* Main Configuration form */}
+        <div className="settings-form-wrapper">
         <GlassCard>
           <form onSubmit={handleSaveAll} className="settings-form-wrapper">
             
@@ -396,6 +401,8 @@ export const Settings: React.FC = () => {
             </button>
           </form>
         </GlassCard>
+        {token && <GlassCard><SleepReminders token={token} cutoffTime={savedCutoffTime} /></GlassCard>}
+        </div>
 
         {/* Danger Action panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -15,10 +15,30 @@ namespace SleepyKoala.Api.Data
         public DbSet<CheckIn> CheckIns { get; set; }
         public DbSet<Badge> Badges { get; set; }
         public DbSet<UserBadge> UserBadges { get; set; }
+        public DbSet<PushDevice> PushDevices { get; set; }
+        public DbSet<PushDelivery> PushDeliveries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<PushDevice>(device =>
+            {
+                device.Property(d => d.Endpoint).HasMaxLength(2048);
+                device.Property(d => d.EndpointHash).HasMaxLength(64);
+                device.Property(d => d.P256dh).HasMaxLength(100);
+                device.Property(d => d.Auth).HasMaxLength(32);
+                device.Property(d => d.TimeZoneId).HasMaxLength(100);
+                device.HasIndex(d => d.EndpointHash).IsUnique();
+                device.HasOne(d => d.User).WithMany().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<PushDelivery>(delivery =>
+            {
+                delivery.Property(d => d.SleepDate).HasMaxLength(10);
+                delivery.Property(d => d.Kind).HasMaxLength(16);
+                delivery.HasIndex(d => new { d.PushDeviceId, d.SleepDate, d.Kind }).IsUnique();
+                delivery.HasOne(d => d.PushDevice).WithMany().HasForeignKey(d => d.PushDeviceId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             modelBuilder.Entity<User>(user =>
             {

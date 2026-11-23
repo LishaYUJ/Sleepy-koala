@@ -4,6 +4,7 @@
 ## Get latest from `dotnet new gitignore`
 
 # dotenv files
+local.settings.json
 .env
 .env.*
 !.env.example

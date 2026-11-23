@@ -94,6 +94,95 @@ namespace SleepyKoala.Api.Migrations
                     b.ToTable("CheckIns");
                 });
 
+            modelBuilder.Entity("SleepyKoala.Api.Models.PushDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ClaimedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PushDeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SleepDate")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PushDeviceId", "SleepDate", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("PushDeliveries");
+                });
+
+            modelBuilder.Entity("SleepyKoala.Api.Models.PushDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EndpointHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastTestAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("OpeningReminder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("WindDownReminder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EndpointHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PushDevices");
+                });
+
             modelBuilder.Entity("SleepyKoala.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -191,6 +280,28 @@ namespace SleepyKoala.Api.Migrations
                 {
                     b.HasOne("SleepyKoala.Api.Models.User", "User")
                         .WithMany("CheckIns")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SleepyKoala.Api.Models.PushDelivery", b =>
+                {
+                    b.HasOne("SleepyKoala.Api.Models.PushDevice", "PushDevice")
+                        .WithMany()
+                        .HasForeignKey("PushDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PushDevice");
+                });
+
+            modelBuilder.Entity("SleepyKoala.Api.Models.PushDevice", b =>
+                {
+                    b.HasOne("SleepyKoala.Api.Models.User", "User")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
