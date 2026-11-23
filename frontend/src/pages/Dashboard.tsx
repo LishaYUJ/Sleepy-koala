@@ -40,6 +40,22 @@ export const Dashboard: React.FC = () => {
   const sliderSubmitting = useRef(false);
   const [holdCompletedSlide, setHoldCompletedSlide] = useState(false);
   const [isKoalaStatusOpen, setIsKoalaStatusOpen] = useState(false);
+  const [isBeingPetted, setIsBeingPetted] = useState(false);
+  const petTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (petTimer.current) clearTimeout(petTimer.current);
+  }, []);
+
+  const petKoala = () => {
+    if (petTimer.current) return;
+    setIsKoalaStatusOpen(false);
+    setIsBeingPetted(true);
+    petTimer.current = setTimeout(() => {
+      setIsBeingPetted(false);
+      petTimer.current = null;
+    }, 2000);
+  };
 
   useEffect(() => {
     if (!isKoalaStatusOpen) return;
@@ -317,20 +333,28 @@ export const Dashboard: React.FC = () => {
         <button
           type="button"
           className={`pet-sprite-stage koala-status-trigger${isInBedAnimation ? ' in-bed' : ''}${useCompactKoalaStage ? ' compact-koala' : ''}`}
-          onClick={() => setIsKoalaStatusOpen((isOpen) => !isOpen)}
-          aria-expanded={isKoalaStatusOpen}
-          aria-controls={popoverId}
-          aria-label={`${isKoalaStatusOpen ? 'Hide' : 'Show'} Koala status. Energy ${energyHearts} out of 10.`}
+          onClick={petKoala}
+          aria-label="Gently pet Koala"
         >
           <img
             src={koalaImage}
             alt={koalaAlt}
-            className={`pet-sprite-image${isInBedAnimation ? ' in-bed' : ''}`}
+            className={`pet-sprite-image${isInBedAnimation ? ' in-bed' : ''}${isBeingPetted ? ' being-petted' : ''}${showSleepingInBedAnimation ? ' sleeping-pet' : ''}`}
           />
-          <span className="koala-energy-peek" aria-hidden="true">
-            <Heart size={14} fill="currentColor" />
-            <span>{energyHearts}/10</span>
-          </span>
+        </button>
+        <span className="koala-pet-message" role="status">
+          {isBeingPetted && !showSleepingInBedAnimation ? 'A little pat. A little better.' : ''}
+        </span>
+        <button
+          type="button"
+          className="koala-energy-peek"
+          onClick={() => setIsKoalaStatusOpen((isOpen) => !isOpen)}
+          aria-expanded={isKoalaStatusOpen}
+          aria-controls={popoverId}
+          aria-label={`${isKoalaStatusOpen ? 'Hide' : 'Show'} Koala energy. ${energyHearts} out of 10.`}
+        >
+          <Heart size={14} fill="currentColor" aria-hidden="true" />
+          <span>{energyHearts}/10</span>
         </button>
 
         {placement === 'mobile' && isKoalaStatusOpen && (
@@ -583,12 +607,81 @@ export const Dashboard: React.FC = () => {
           transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease;
         }
 
+        .koala-energy-peek {
+          min-height: 44px;
+          min-width: 44px;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .koala-energy-peek:focus-visible {
+          outline: 2px solid #c4b5fd;
+          outline-offset: 4px;
+        }
+
+        .koala-pet-message {
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: max-content;
+          max-width: 85vw;
+          text-align: center;
+          color: #f3edd7;
+          background: #202442;
+          border-radius: 14px;
+          padding: 10px 16px;
+          font-size: 0.9rem;
+          pointer-events: none;
+        }
+
+        .koala-pet-message:empty { display: none; }
+
+        .pet-sprite-image.being-petted {
+          transform-origin: 50% 80%;
+          animation: koala-nuzzle 1.2s ease-out both;
+        }
+
+        .pet-sprite-image.in-bed.being-petted {
+          animation: koala-bed-nuzzle 1.2s ease-out both;
+        }
+
+        .pet-sprite-image.in-bed.being-petted.sleeping-pet {
+          animation: koala-sleep-stir 1.4s ease-out both;
+        }
+
+        @keyframes koala-nuzzle {
+          0%, 100% { transform: rotate(0) scale(1); }
+          30% { transform: rotate(-4deg) scale(0.97, 0.95); }
+          60% { transform: rotate(2deg) scale(1.015); }
+        }
+
+        @keyframes koala-bed-nuzzle {
+          0%, 100% { transform: translateY(-12%) rotate(0); }
+          35% { transform: translateY(-12%) rotate(-2deg) scale(0.98); }
+          65% { transform: translateY(-12%) rotate(1deg); }
+        }
+
+        @keyframes koala-sleep-stir {
+          0%, 100% { transform: translateY(-12%) rotate(0); }
+          45% { transform: translateY(-12%) rotate(-0.7deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .pet-sprite-image,
+          .pet-sprite-image.being-petted,
+          .pet-sprite-image.in-bed.being-petted,
+          .pet-sprite-image.in-bed.being-petted.sleeping-pet {
+            animation: none;
+          }
+        }
+
         .mobile-energy-orbit {
           display: none;
         }
 
-        .koala-status-trigger:hover .koala-energy-peek,
-        .koala-status-trigger:focus-visible .koala-energy-peek,
+        .koala-energy-peek:hover,
+        .koala-energy-peek:focus-visible,
         .koala-status-anchor.is-open .koala-energy-peek {
           transform: translateY(-3px);
           border-color: rgba(243, 167, 187, 0.38);
@@ -1436,7 +1529,8 @@ export const Dashboard: React.FC = () => {
           }
 
           .koala-energy-peek {
-            display: none;
+            right: 0;
+            bottom: 12px;
           }
 
           .koala-status-anchor.mobile.is-open {
