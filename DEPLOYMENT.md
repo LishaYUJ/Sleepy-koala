@@ -1,5 +1,8 @@
 # Azure deployment configuration
 
+For optional Web Push reminders, persistent keys, the database migration, and the
+independent timer required by the current F1 plan, see [web-push-reminders.md](docs/web-push-reminders.md).
+
 The application keeps local development and Azure production configuration separate:
 
 - Local development uses SQLite and the Vite `/api` proxy.

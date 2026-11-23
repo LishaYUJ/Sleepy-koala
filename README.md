@@ -24,7 +24,7 @@ The repair treats registration as a recoverable operation rather than blindly re
 4. Replaying the same ID and matching details returns the original account with a fresh token.
 5. Reusing an ID with different details is rejected, and email uniqueness remains the fallback after a page reload.
 
-This preserves a consistent user outcome even when the client cannot know whether the first response was lost before or after the database commit. The investigation, rollout, migration, verification, and remaining risks are recorded in [the maintenance log](docs/maintenance-log.md) and [the reliability notes](docs/registration-reliability-notes.md).
+This preserves a consistent user outcome even when the client cannot know whether the first response was lost before or after the database commit. The investigation, rollout, migration, verification, and remaining risks are recorded in [the maintenance log](docs/maintenance-log.md).
 
 ### A domain model for sleep days, not calendar days
 
@@ -87,8 +87,8 @@ The frontend and backend deploy independently. Vercel receives the API base URL 
 
 The current test suite contains:
 
-- **76 frontend tests** covering state transitions, authentication recovery, component behaviour, energy calculations, and history presentation;
-- **56 backend tests** covering authentication, authorization, idempotency, CORS, API integration, check-in rules, and sleep-day boundaries.
+- **92 frontend tests** covering state transitions, authentication recovery, component behaviour, energy calculations, and history presentation;
+- **90 backend tests** covering authentication, authorization, idempotency, CORS, API integration, check-in rules, and sleep-day boundaries.
 
 GitHub Actions builds and tests the frontend and backend on every pull request and push to `main`.
 
@@ -168,7 +168,6 @@ Prompt summaries and outcomes are recorded in [specs/ai-prompts.md](specs/ai-pro
 ## Additional documentation
 
 - [Production maintenance log](docs/maintenance-log.md)
-- [Registration reliability notes](docs/registration-reliability-notes.md)
 - [Deployment configuration](DEPLOYMENT.md)
 - [Assessment evidence](docs/assessment-evidence.md)
 - [API design](specs/api-design.md)
