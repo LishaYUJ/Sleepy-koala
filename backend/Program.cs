@@ -67,6 +67,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddSingleton(_ => JwtSettings.FromConfiguration(builder.Configuration));
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICheckInService, CheckInService>();
+builder.Services.AddScoped<CheckInSummaryService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ISleepCalendarService, SleepCalendarService>();
 

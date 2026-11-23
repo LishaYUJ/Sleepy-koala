@@ -72,7 +72,9 @@ describe('History', () => {
     ];
 
     useStore.setState({ token: 'token', history, isLoading: false, error: null });
-    vi.spyOn(api, 'get').mockResolvedValue(history);
+    vi.spyOn(api, 'get').mockImplementation(async (url) => url.includes('/summary')
+      ? { total: 0, onTime: 0, late: 0, onTimeRate: null, weeks: [] } as any
+      : history);
 
     render(<History />);
 
@@ -93,7 +95,9 @@ describe('History', () => {
     }));
 
     useStore.setState({ token: 'token', history, isLoading: false, error: null });
-    vi.spyOn(api, 'get').mockResolvedValue(history);
+    vi.spyOn(api, 'get').mockImplementation(async (url) => url.includes('/summary')
+      ? { total: 0, onTime: 0, late: 0, onTimeRate: null, weeks: [] } as any
+      : history);
 
     render(<History />);
 
@@ -122,7 +126,9 @@ describe('History', () => {
     ];
 
     useStore.setState({ token: 'token', history, isLoading: false, error: null });
-    vi.spyOn(api, 'get').mockResolvedValue(history);
+    vi.spyOn(api, 'get').mockImplementation(async (url) => url.includes('/summary')
+      ? { total: 0, onTime: 0, late: 0, onTimeRate: null, weeks: [] } as any
+      : history);
 
     render(<History />);
 

@@ -54,6 +54,23 @@ namespace SleepyKoala.Api.Controllers
             }
         }
 
+        [HttpGet("me/summary")]
+        public async Task<IActionResult> GetMySummary([FromQuery] string from, [FromQuery] string to,
+            [FromServices] CheckInSummaryService summary)
+        {
+            var userId = User.GetUserId();
+            if (userId == null) return Unauthorized();
+            try
+            {
+                var range = CheckInSummaryService.ParseRange(from, to);
+                return Ok(await summary.GetAsync(userId.Value, range.From, range.To));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = "InvalidRange", message = ex.Message });
+            }
+        }
+
         [HttpGet("me")]
         public async Task<IActionResult> GetMyCheckIns([FromQuery] string localDate, [FromQuery] string localTime)
         {

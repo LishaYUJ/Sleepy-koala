@@ -1,3 +1,4 @@
+import { CheckInSummary } from '../components/CheckInSummary';
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Circle, CircleDashed, Clock3, Moon, Sparkles } from 'lucide-react';
 import { useStore, type CheckInHistory } from '../stores/useStore';
@@ -218,6 +219,8 @@ export const History: React.FC = () => {
         <h1 className="brand-font">Your sleep journey</h1>
         <p>A gentle look back at the nights you shared with Koala.</p>
       </header>
+
+      <CheckInSummary />
 
       <section className="journey-calendar-shell" aria-labelledby="journey-month-title">
         <div className="journey-month-bar">

@@ -78,6 +78,30 @@ namespace SleepyKoala.Tests
         }
 
         [Fact]
+        public async Task SummaryEndpoint_RequiresLoginAndValidatesRange()
+        {
+            var client = _factory.CreateClient();
+            var path = "/api/checkins/me/summary?from=2026-01-01&to=2026-01-31";
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(path)).StatusCode);
+            var registration = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
+            {
+                RegistrationAttemptId = Guid.NewGuid(),
+                Email = $"summary-{Guid.NewGuid():N}@example.com", Password = "Password123!", Nickname = "Summary"
+            });
+            Assert.Equal(HttpStatusCode.OK, registration.StatusCode);
+            var auth = await registration.Content.ReadFromJsonAsync<AuthResponse>();
+            Assert.NotNull(auth);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            var response = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var summary = await response.Content.ReadFromJsonAsync<SleepyKoala.Api.Services.CheckInSummary>();
+            Assert.NotNull(summary);
+            Assert.Equal(0, summary.Total);
+            Assert.Null(summary.OnTimeRate);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/checkins/me/summary?from=2026-02-30&to=2026-03-01")).StatusCode);
+        }
+
+        [Fact]
         public async Task HealthEndpoint_IsAvailableWithoutAuthentication()
         {
             var client = _factory.CreateClient();
@@ -626,6 +650,35 @@ namespace SleepyKoala.Tests
                 Assert.Equal(HttpStatusCode.BadRequest,
                     (await client.GetAsync(path + "?localDate=2026-07-17&localTime=25:00")).StatusCode);
             }
+        }
+
+        [Fact]
+        public async Task NewAccount_AfterMidnightCanCheckInWithoutBeingMarkedMissing()
+        {
+            var client = _factory.CreateClient();
+            var credentials = await RegisterUserAsync(client);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+            var setup = await client.PutAsJsonAsync("/api/settings/me", new UpdateSettingsRequest
+            {
+                Nickname = credentials.Nickname, CutoffTime = "23:30", OnboardingCompleted = true,
+                LocalDate = "2026-11-02", LocalTime = "00:20"
+            });
+            setup.EnsureSuccessStatusCode();
+            var before = await client.GetFromJsonAsync<DashboardSummaryDto>(
+                "/api/me/summary?localDate=2026-11-02&localTime=00:20");
+            Assert.False(before!.TodayCheckedIn);
+            Assert.Null(before.TodayStatus);
+            Assert.Equal(0, before.FatigueScore);
+
+            var checkIn = await client.PostAsJsonAsync("/api/checkins", new CheckInRequest
+            {
+                LocalDate = "2026-11-02", LocalTime = "00:20"
+            });
+            checkIn.EnsureSuccessStatusCode();
+            var after = await client.GetFromJsonAsync<DashboardSummaryDto>(
+                "/api/me/summary?localDate=2026-11-02&localTime=00:20");
+            Assert.True(after!.TodayCheckedIn);
+            Assert.Equal("late", after.TodayStatus);
         }
 
         [Fact]

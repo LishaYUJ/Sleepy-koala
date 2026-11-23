@@ -1,0 +1,19 @@
+.checkin-summary { margin-bottom:28px; padding:24px; border:1px solid rgba(165,180,252,.15); border-radius:22px; background:rgba(8,11,28,.5); }
+.checkin-summary h2,.checkin-summary h3 { color:#f3edd7; margin:0 0 18px; }
+.checkin-summary h3 { margin-top:24px; font-size:1rem; }
+.checkin-summary p { color:var(--text-muted); font-size:.82rem; line-height:1.6; }
+.checkin-summary form { display:flex; flex-wrap:wrap; gap:14px; align-items:end; }
+.checkin-summary label { display:grid; gap:7px; font-size:.85rem; }
+.checkin-summary input,.checkin-summary button { font:inherit; padding:9px 12px; border:1px solid #67718d; border-radius:8px; background:#171d35; color:#f3edd7; color-scheme:dark; }
+.checkin-summary button { cursor:pointer; }
+.checkin-summary dl { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:22px 0; }
+.checkin-summary dt { color:var(--text-muted); font-size:.8rem; }
+.checkin-summary dd { margin:8px 0 0; color:#f3edd7; font-size:1.7rem; font-variant-numeric:tabular-nums; }
+.summary-table-wrap { overflow-x:auto; }
+.checkin-summary table { width:100%; border-collapse:collapse; font-size:.8rem; text-align:left; }
+.checkin-summary td,.checkin-summary th { padding:12px 8px; border-bottom:1px solid rgba(165,180,252,.12); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.summary-bar { display:flex; width:120px; height:12px; background:#252b42; border-radius:3px; overflow:hidden; }
+.summary-bar span:first-child { background:#a5b4fc; }
+.summary-bar span:last-child { background:#c49fca; }
+@media(max-width:600px) { .checkin-summary { padding:18px; } .checkin-summary dl { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.checkin-summary .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
